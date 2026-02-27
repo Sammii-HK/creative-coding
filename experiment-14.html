@@ -18,9 +18,9 @@
 const IMG_FILE  = 'DSCF7641.JPG';
 const CANVAS_W  = 900;
 const CANVAS_H  = 540;
-const NUM_BOKEH = 2200;
+const NUM_BOKEH = 4000;
 const CELL      = 8;
-const HOVER_R   = 140;   // radius of influence around cursor
+const HOVER_R   = 120;   // radius of influence around cursor
 
 let img;
 let offX, offY, drawW, drawH;
@@ -70,11 +70,11 @@ function makeBokeh() {
   return {
     x, y,
     r, g, b,
-    restSize:  random(1.5, 6),     // resting disc radius
-    bloomSize: random(12, 32),     // bloomed radius when hovered
+    restSize:  random(4, 18),      // resting disc radius — large enough to overlap
+    bloomSize: random(18, 36),     // bloomed radius when hovered
     vx: random(-0.06, 0.06),
     vy: random(-0.06, 0.06),
-    restAlpha: random(40, 120),
+    restAlpha: random(90, 180),    // visible at rest
     // Phase offset so discs twinkle independently
     phase: random(TWO_PI),
   };
@@ -107,14 +107,14 @@ function draw() {
     // Gentle autonomous twinkle (subtle — hover is the main event)
     const twinkle = 0.5 + 0.5 * sin(t + p.phase);
 
-    // Size: rest + bloom
-    const sz = lerp(p.restSize, p.bloomSize, smooth) * (1 + twinkle * 0.12);
+    // Size: gentle grow on hover
+    const sz = lerp(p.restSize, p.bloomSize, smooth * 0.5) * (1 + twinkle * 0.08);
 
-    // Alpha: dims at rest, full bright on hover
-    const alpha = lerp(p.restAlpha * (0.6 + twinkle * 0.4), 240, smooth);
+    // Alpha: already fairly visible at rest, just nudges brighter on hover
+    const alpha = lerp(p.restAlpha * (0.8 + twinkle * 0.2), min(p.restAlpha + 55, 230), smooth);
 
-    // Colour: warm toward white when bloomed
-    const boost = smooth * 90;
+    // Colour: very subtle warm on hover
+    const boost = smooth * 28;
     fill(
       min(p.r + boost, 255),
       min(p.g + boost * 0.8, 255),
