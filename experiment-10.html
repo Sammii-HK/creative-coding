@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Flow Field — 10</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; cursor: none; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; cursor: pointer; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE      = 'DSCF7641.JPG';
+const CANVAS_W      = 900;
+const CANVAS_H      = 540;
+const NUM_PARTICLES = 4500;
+const FIELD_SCALE   = 0.0035;  // noise zoom — smaller = smoother flow
+const FIELD_SPEED   = 0.0006;  // how fast the field evolves over time
+const PARTICLE_SPEED = 2.2;
+const MAX_AGE       = 140;     // frames before a particle resets
+
+let img;
+let particles = [];
+let imgOffX, imgOffY, drawW, drawH;
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+  img.loadPixels();
+
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  drawW   = img.width  * scale;
+  drawH   = img.height * scale;
+  imgOffX = (CANVAS_W - drawW) / 2;
+  imgOffY = (CANVAS_H - drawH) / 2;
+
+  for (let i = 0; i < NUM_PARTICLES; i++) {
+    particles.push(makeParticle());
+  }
+
+  background(0);
+}
+
+function sampleImage(x, y) {
+  const ix = constrain(floor((x - imgOffX) / drawW * img.width),  0, img.width  - 1);
+  const iy = constrain(floor((y - imgOffY) / drawH * img.height), 0, img.height - 1);
+  const i  = (iy * img.width + ix) * 4;
+  return [img.pixels[i], img.pixels[i + 1], img.pixels[i + 2]];
+}
+
+function makeParticle(x, y) {
+  const px = x ?? random(CANVAS_W);
+  const py = y ?? random(CANVAS_H);
+  const [r, g, b] = sampleImage(px, py);
+  const lum = r * 0.299 + g * 0.587 + b * 0.114;
+  return {
+    x: px, y: py,
+    px: px, py: py,  // previous position (for line drawing)
+    r, g, b, lum,
+    age: floor(random(MAX_AGE)),  // stagger ages so not all reset at once
+    maxAge: floor(random(MAX_AGE * 0.5, MAX_AGE)),
+  };
+}
+
+function flowAngle(x, y, t) {
+  // Mouse tilts the field by adding a directional bias
+  const mx = mouseX / CANVAS_W - 0.5;  // -0.5 to 0.5
+  const my = mouseY / CANVAS_H - 0.5;
+  const mouseAngle = atan2(my, mx);
+  const mouseBias  = dist(mouseX, mouseY, CANVAS_W/2, CANVAS_H/2) / (CANVAS_W * 0.7);
+
+  const n = noise(x * FIELD_SCALE, y * FIELD_SCALE, t);
+  return n * TWO_PI * 2.5 + mouseAngle * mouseBias * 1.2;
+}
+
+function draw() {
+  // Very slight fade — leaves long trails
+  noStroke();
+  fill(0, 0, 0, 18);
+  rect(0, 0, CANVAS_W, CANVAS_H);
+
+  const t = frameCount * FIELD_SPEED;
+
+  strokeWeight(0.9);
+  noFill();
+
+  for (const p of particles) {
+    p.age++;
+
+    // Reset particle when too old or off canvas
+    if (p.age > p.maxAge || p.x < 0 || p.x > CANVAS_W || p.y < 0 || p.y > CANVAS_H) {
+      const np = makeParticle();
+      p.x = np.x; p.y = np.y;
+      p.px = np.x; p.py = np.y;
+      p.r = np.r; p.g = np.g; p.b = np.b; p.lum = np.lum;
+      p.age = 0;
+      p.maxAge = np.maxAge;
+      continue;
+    }
+
+    // Flow field angle at current position
+    const angle = flowAngle(p.x, p.y, t);
+
+    p.px = p.x;
+    p.py = p.y;
+    p.x += cos(angle) * PARTICLE_SPEED;
+    p.y += sin(angle) * PARTICLE_SPEED;
+
+    // Resample colour from image at new position (so colour shifts as particle moves)
+    const [r, g, b] = sampleImage(p.x, p.y);
+    p.r = lerp(p.r, r, 0.05);
+    p.g = lerp(p.g, g, 0.05);
+    p.b = lerp(p.b, b, 0.05);
+
+    // Alpha fades in and out over lifetime
+    const lifeFraction = p.age / p.maxAge;
+    const alpha = sin(lifeFraction * PI) * 160 + 20;
+
+    stroke(p.r, p.g, p.b, alpha);
+    line(p.px, p.py, p.x, p.y);
+  }
+
+  // Custom cursor — tiny crosshair
+  if (mouseX > 0 && mouseX < CANVAS_W) {
+    push();
+    stroke(255, 255, 255, 50);
+    strokeWeight(0.5);
+    line(mouseX - 8, mouseY, mouseX + 8, mouseY);
+    line(mouseX, mouseY - 8, mouseX, mouseY + 8);
+    pop();
+  }
+}
+</script>
+</body>
+</html>
