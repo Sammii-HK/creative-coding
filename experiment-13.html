@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Chromatic Glitch — 13</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE = 'DSCF7641.JPG';
+const CANVAS_W = 900;
+const CANVAS_H = 540;
+
+let img;
+let offX, offY, drawW, drawH;
+
+// Per-channel graphics buffers (updated only when needed)
+let rGfx, gGfx, bGfx;
+
+// Glitch state
+let intensity    = 0;       // 0..1 current smoothed intensity
+let targetIntens = 0;
+let glitchTimer  = 0;
+let aberX        = 0;       // red shift (pixels)
+let aberY        = 0;
+let slices       = [];      // { y, h, shiftX, life, age }
+let scanPower    = 0;
+
+// Mouse
+let smx = 0, smy = 0;
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  drawW = img.width  * scale;
+  drawH = img.height * scale;
+  offX  = (CANVAS_W - drawW) / 2;
+  offY  = (CANVAS_H - drawH) / 2;
+
+  // Build single-channel buffers once
+  rGfx = buildChannelGfx(255, 0, 0);
+  gGfx = buildChannelGfx(0, 255, 0);
+  bGfx = buildChannelGfx(0, 0, 255);
+
+  scheduleNext();
+}
+
+function buildChannelGfx(r, g, b) {
+  const gfx = createGraphics(CANVAS_W, CANVAS_H);
+  gfx.pixelDensity(1);
+  gfx.background(0);
+  gfx.tint(r, g, b);
+  gfx.image(img, offX, offY, drawW, drawH);
+  gfx.noTint();
+  return gfx;
+}
+
+function scheduleNext() {
+  glitchTimer = floor(random(25, 80));
+}
+
+function triggerGlitch(strength) {
+  strength     = strength ?? random(0.3, 1.0);
+  targetIntens = strength;
+  aberX        = random(-22, 22) * strength;
+  aberY        = random(-5,   5) * strength;
+  scanPower    = random(0.15, 0.7) * strength;
+
+  const count = floor(random(1, 10) * strength);
+  for (let i = 0; i < count; i++) {
+    slices.push({
+      y:      floor(random(CANVAS_H)),
+      h:      max(2, floor(random(2, 30) * strength)),
+      shiftX: random(-80, 80) * strength,
+      life:   floor(random(4, 20)),
+      age:    0,
+    });
+  }
+  scheduleNext();
+}
+
+function draw() {
+  background(0);
+
+  smx = lerp(smx, mouseX, 0.05);
+  smy = lerp(smy, mouseY, 0.05);
+
+  const mx = constrain(smx / CANVAS_W, 0, 1);
+  const my = constrain(smy / CANVAS_H, 0, 1);
+  // Ambient mouse-driven distortion (subtle when no glitch)
+  const mAX = (mx - 0.5) * 20;
+  const mAY = (my - 0.5) * 6;
+
+  // Decay
+  intensity    = lerp(intensity,    targetIntens, 0.10);
+  targetIntens = lerp(targetIntens, 0,            0.05);
+
+  // Auto-trigger
+  glitchTimer--;
+  if (glitchTimer <= 0) triggerGlitch();
+
+  // Age & cull slices
+  for (const s of slices) s.age++;
+  slices = slices.filter(s => s.age < s.life);
+
+  const ax = aberX * intensity + mAX;
+  const ay = aberY * intensity + mAY;
+
+  // ── Chromatic separation via ADD blend ──
+  blendMode(ADD);
+  image(rGfx, ax,        ay);           // red shifted right
+  image(gGfx, 0,         0);            // green anchor
+  image(bGfx, -ax * 0.7, -ay * 0.7);   // blue shifted left
+  blendMode(BLEND);
+
+  // ── Horizontal slice tears ──
+  for (const s of slices) {
+    const fade = 1 - s.age / s.life;
+    drawingContext.save();
+    drawingContext.globalAlpha = fade;
+    drawingContext.beginPath();
+    drawingContext.rect(0, s.y, CANVAS_W, s.h);
+    drawingContext.clip();
+    // Draw full image shifted sideways — only the clipped strip shows
+    drawingContext.drawImage(img.canvas ?? img.elt, offX + s.shiftX, offY, drawW, drawH);
+    drawingContext.restore();
+  }
+
+  // ── Scanline flicker ──
+  const sl = scanPower * intensity + my * 0.06;
+  if (sl > 0.005) {
+    noStroke();
+    for (let y = 0; y < CANVAS_H; y += 2) {
+      fill(0, 0, 0, sl * random(20, 70));
+      rect(0, y, CANVAS_W, 1);
+    }
+  }
+
+  // ── Vignette ──
+  push();
+  noStroke();
+  const cx = CANVAS_W / 2, cy = CANVAS_H / 2;
+  const grad = drawingContext.createRadialGradient(cx, cy, 0, cx, cy, CANVAS_W * 0.72);
+  grad.addColorStop(0,   'rgba(0,0,0,0)');
+  grad.addColorStop(0.6, 'rgba(0,0,0,0)');
+  grad.addColorStop(1,   'rgba(0,0,0,0.7)');
+  drawingContext.fillStyle = grad;
+  drawingContext.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  pop();
+
+  // ── Label ──
+  push();
+  textFont('Courier New');
+  textSize(8);
+  textAlign(LEFT, BOTTOM);
+  noStroke();
+  fill(255, 255, 255, 18);
+  text('chromatic aberration — move mouse · click to glitch', 12, CANVAS_H - 10);
+  pop();
+}
+
+function mousePressed() {
+  triggerGlitch(random(0.7, 1.0));
+}
+</script>
+</body>
+</html>
