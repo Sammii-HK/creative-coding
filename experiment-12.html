@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Crystal Growth — 12</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE   = 'DSCF7641.JPG';
+const CANVAS_W   = 900;
+const CANVAS_H   = 540;
+const CELL       = 7;
+const NUM_SEEDS  = 32;
+const GROW_RATE  = 12;   // cells added per frame
+const HOLD_MS    = 1800; // ms to hold fully grown before reset
+
+let img;
+let COLS, ROWS;
+let imgColors = [];  // [col][row] = [r, g, b]
+let grid      = [];  // [col][row] = { owner, age, r, g, b } | null
+let frontier  = [];  // cells to grow next: { col, row, owner }
+let seeds     = [];  // { col, row, r, g, b }
+let phase     = 'grow';
+let holdStart = 0;
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+  img.loadPixels();
+
+  COLS = floor(CANVAS_W / CELL);
+  ROWS = floor(CANVAS_H / CELL);
+
+  buildImgColors();
+  reset();
+}
+
+function buildImgColors() {
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  const drawW = img.width * scale, drawH = img.height * scale;
+  const offX  = (CANVAS_W - drawW) / 2, offY = (CANVAS_H - drawH) / 2;
+
+  for (let col = 0; col < COLS; col++) {
+    imgColors[col] = [];
+    for (let row = 0; row < ROWS; row++) {
+      const cx = col * CELL + CELL / 2;
+      const cy = row * CELL + CELL / 2;
+      const ix = constrain(floor((cx - offX) / drawW * img.width),  0, img.width  - 1);
+      const iy = constrain(floor((cy - offY) / drawH * img.height), 0, img.height - 1);
+      const i  = (iy * img.width + ix) * 4;
+      imgColors[col][row] = [img.pixels[i], img.pixels[i+1], img.pixels[i+2]];
+    }
+  }
+}
+
+function reset() {
+  // Clear grid
+  grid     = [];
+  frontier = [];
+  seeds    = [];
+
+  for (let col = 0; col < COLS; col++) {
+    grid[col] = new Array(ROWS).fill(null);
+  }
+
+  // Place seeds at random positions
+  for (let s = 0; s < NUM_SEEDS; s++) {
+    const col = floor(random(COLS));
+    const row = floor(random(ROWS));
+    const [r, g, b] = imgColors[col][row];
+    seeds.push({ col, row, r, g, b, id: s });
+
+    grid[col][row] = { owner: s, age: 0, r, g, b, fresh: true };
+    // Add neighbours to frontier
+    addNeighbours(col, row, s);
+  }
+
+  phase = 'grow';
+}
+
+function addNeighbours(col, row, owner) {
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+  for (const [dc, dr] of dirs) {
+    const nc = col + dc, nr = row + dr;
+    if (nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS && !grid[nc][nr]) {
+      frontier.push({ col: nc, row: nr, owner });
+    }
+  }
+}
+
+function draw() {
+  background(0);
+
+  if (phase === 'grow') {
+    // Grow GROW_RATE cells per frame
+    let grown = 0;
+    while (frontier.length > 0 && grown < GROW_RATE) {
+      // Pick random frontier cell for organic branching
+      const idx  = floor(random(min(frontier.length, GROW_RATE * 4)));
+      const cell = frontier.splice(idx, 1)[0];
+      const { col, row, owner } = cell;
+
+      if (grid[col][row]) continue;  // already claimed
+
+      const [r, g, b] = imgColors[col][row];
+      grid[col][row] = { owner, age: 0, r, g, b, fresh: true };
+      addNeighbours(col, row, owner);
+      grown++;
+    }
+
+    if (frontier.length === 0) {
+      phase     = 'hold';
+      holdStart = millis();
+    }
+  } else if (phase === 'hold') {
+    if (millis() - holdStart > HOLD_MS) reset();
+  }
+
+  // Increment age of fresh cells
+  for (let col = 0; col < COLS; col++) {
+    for (let row = 0; row < ROWS; row++) {
+      if (grid[col][row]) grid[col][row].age++;
+    }
+  }
+
+  // Draw cells
+  noStroke();
+  for (let col = 0; col < COLS; col++) {
+    for (let row = 0; row < ROWS; row++) {
+      const cell = grid[col][row];
+      if (!cell) continue;
+
+      const cx = col * CELL, cy = row * CELL;
+
+      // Brightness flash when freshly claimed, fades to resting
+      const flash = map(constrain(cell.age, 0, 20), 0, 20, 100, 0);
+      const alpha = map(constrain(cell.age, 0, 10), 0, 10, 0, 200);
+
+      fill(
+        min(cell.r + flash, 255),
+        min(cell.g + flash, 255),
+        min(cell.b + flash, 255),
+        alpha
+      );
+      rect(cx, cy, CELL - 1, CELL - 1);
+    }
+  }
+
+  // Draw crystal boundaries — thin lines between different owners
+  stroke(0, 0, 0, 80);
+  strokeWeight(1);
+  for (let col = 0; col < COLS - 1; col++) {
+    for (let row = 0; row < ROWS - 1; row++) {
+      const c = grid[col][row];
+      const r = grid[col + 1][row];
+      const d = grid[col][row + 1];
+      if (!c) continue;
+      if (r && r.owner !== c.owner) {
+        line((col + 1) * CELL, row * CELL, (col + 1) * CELL, (row + 1) * CELL);
+      }
+      if (d && d.owner !== c.owner) {
+        line(col * CELL, (row + 1) * CELL, (col + 1) * CELL, (row + 1) * CELL);
+      }
+    }
+  }
+
+  // Seed points
+  noStroke();
+  for (const s of seeds) {
+    fill(255, 255, 255, 60);
+    circle(s.col * CELL + CELL / 2, s.row * CELL + CELL / 2, 3);
+  }
+}
+</script>
+</body>
+</html>
