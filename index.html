@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Creative Coding</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 48px;
+      padding: 60px 40px;
+    }
+    h1 {
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #444;
+    }
+    .experiments {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      width: 100%;
+      max-width: 640px;
+    }
+    a.card {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid #1a1a1a;
+      padding: 20px 24px;
+      transition: border-color 0.2s;
+    }
+    a.card:hover { border-color: #444; }
+    .card-num {
+      font-size: 10px;
+      color: #333;
+      letter-spacing: 0.15em;
+    }
+    .card-title {
+      font-size: 13px;
+      color: #888;
+      letter-spacing: 0.1em;
+    }
+    .card-desc {
+      font-size: 10px;
+      color: #333;
+      text-align: right;
+      max-width: 200px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Creative Coding — Sammii</h1>
+  <div class="experiments">
+    <a class="card" href="experiment-01.html">
+      <span class="card-num">01</span>
+      <span class="card-title">Pixel Scanner</span>
+      <span class="card-desc">RGB scan cursor with orbital analysis</span>
+    </a>
+    <a class="card" href="experiment-02.html">
+      <span class="card-num">02</span>
+      <span class="card-title">Codified Image</span>
+      <span class="card-desc">Image rendered as its own pixel data</span>
+    </a>
+  </div>
+</body>
+</html>

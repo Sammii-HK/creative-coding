@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Codified Image — 02</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      gap: 16px;
+    }
+    canvas { display: block; }
+    #back {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: #222;
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+// ─── Config ──────────────────────────────────────────────────────────────────
+const IMG_FILE   = 'DSCF7641.JPG';
+const CANVAS_W   = 900;
+const CANVAS_H   = 540;
+const CELL       = 9;         // px per number cell — controls density
+const SCAN_SPEED = 1.6;       // px per frame
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let img;
+let scaledPx;           // pre-sampled pixel grid matching canvas dimensions
+let scanX   = 0;
+let phase   = 'reveal'; // reveal | hold | collapse
+let holdTimer = 0;
+const HOLD_FRAMES = 180;
+
+// Orbits — seeded when image loads
+let orbitPoints = [];
+
+// ─── p5 ──────────────────────────────────────────────────────────────────────
+function preload() {
+  img = loadImage(IMG_FILE);
+}
+
+function setup() {
+  createCanvas(CANVAS_W, CANVAS_H);
+  textFont('Courier New');
+  buildPixelGrid();
+  seedOrbits();
+}
+
+// Pre-sample the image onto every canvas pixel (once, not per frame)
+function buildPixelGrid() {
+  const scale  = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  const drawW  = img.width  * scale;
+  const drawH  = img.height * scale;
+  const offX   = (CANVAS_W - drawW) / 2;
+  const offY   = (CANVAS_H - drawH) / 2;
+
+  img.loadPixels();
+  scaledPx = new Array(CANVAS_W * CANVAS_H);
+
+  for (let cy = 0; cy < CANVAS_H; cy++) {
+    for (let cx = 0; cx < CANVAS_W; cx++) {
+      // Map canvas pixel → image pixel
+      const imgX = Math.floor((cx - offX) / drawW * img.width);
+      const imgY = Math.floor((cy - offY) / drawH * img.height);
+
+      if (imgX < 0 || imgX >= img.width || imgY < 0 || imgY >= img.height) {
+        scaledPx[cy * CANVAS_W + cx] = [0, 0, 0];
+        continue;
+      }
+      const i = (imgY * img.width + imgX) * 4;
+      scaledPx[cy * CANVAS_W + cx] = [
+        img.pixels[i],
+        img.pixels[i + 1],
+        img.pixels[i + 2],
+      ];
+    }
+  }
+}
+
+// Pick 3 visually interesting orbit points (highest saturation cells)
+function seedOrbits() {
+  const cols = Math.floor(CANVAS_W / CELL);
+  const rows = Math.floor(CANVAS_H / CELL);
+
+  const candidates = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const cx = col * CELL + CELL / 2;
+      const cy = row * CELL + CELL / 2;
+      const [r, g, b] = getCell(cx, cy);
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      const sat = mx === 0 ? 0 : (mx - mn) / mx;
+      const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+      // Prefer saturated, mid-brightness cells
+      if (sat > 0.25 && lum > 0.1 && lum < 0.9) {
+        candidates.push({ cx, cy, r, g, b, sat });
+      }
+    }
+  }
+
+  candidates.sort((a, b) => b.sat - a.sat);
+
+  // Pick 3 spread across the image
+  const chosen = [];
+  for (const c of candidates) {
+    if (chosen.length >= 3) break;
+    const tooClose = chosen.some(o => dist(o.cx, o.cy, c.cx, c.cy) < 120);
+    if (!tooClose) chosen.push(c);
+  }
+
+  orbitPoints = chosen.map((c, i) => ({
+    ...c,
+    rx: 18 + i * 7,
+    ry: 10 + i * 4,
+    speed: 0.018 * (i % 2 === 0 ? 1 : -1.3),
+    phaseOffset: i * TWO_PI / 3,
+  }));
+}
+
+// Sample average color of a CELL-sized block centred at (cx, cy)
+function getCell(cx, cy) {
+  const x0 = Math.floor(cx - CELL / 2);
+  const y0 = Math.floor(cy - CELL / 2);
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let dy = 0; dy < CELL; dy++) {
+    for (let dx = 0; dx < CELL; dx++) {
+      const px = x0 + dx, py = y0 + dy;
+      if (px < 0 || px >= CANVAS_W || py < 0 || py >= CANVAS_H) continue;
+      const c = scaledPx[py * CANVAS_W + px];
+      r += c[0]; g += c[1]; b += c[2]; n++;
+    }
+  }
+  if (n === 0) return [0, 0, 0];
+  return [r / n, g / n, b / n];
+}
+
+// ─── Draw ─────────────────────────────────────────────────────────────────────
+function draw() {
+  background(0);
+
+  const cols = Math.floor(CANVAS_W / CELL);
+  const rows = Math.floor(CANVAS_H / CELL);
+
+  textSize(CELL - 1);
+  textAlign(CENTER, CENTER);
+  noStroke();
+
+  // ── Phase logic ──
+  if (phase === 'reveal') {
+    scanX += SCAN_SPEED;
+    if (scanX >= CANVAS_W + CELL) {
+      phase = 'hold';
+      holdTimer = 0;
+      scanX = CANVAS_W + CELL;
+    }
+  } else if (phase === 'hold') {
+    holdTimer++;
+    if (holdTimer >= HOLD_FRAMES) {
+      phase = 'collapse';
+    }
+  } else if (phase === 'collapse') {
+    scanX -= SCAN_SPEED * 1.4;
+    if (scanX <= -CELL) {
+      phase = 'reveal';
+      scanX = -CELL;
+    }
+  }
+
+  // ── Number grid ──
+  for (let row = 0; row < rows; row++) {
+    const cy = row * CELL + CELL / 2;
+
+    for (let col = 0; col < cols; col++) {
+      const cx = col * CELL + CELL / 2;
+      const [r, g, b] = getCell(cx, cy);
+      const lum = (r * 0.299 + g * 0.587 + b * 0.114);
+
+      const distFromScan = cx - scanX;
+
+      // Behind cursor (revealed)
+      if (distFromScan < 0) {
+        // Brightness-based alpha: darker pixels are dimmer, brighter are more visible
+        const a = map(lum, 0, 255, 20, 220);
+        fill(r, g, b, a);
+        // Value shown: luminance as 3-digit int
+        text(String(Math.round(lum)).padStart(3, '0'), cx, cy);
+      }
+      // At the cursor edge — flash bright
+      else if (distFromScan < CELL * 3) {
+        const flashA = map(distFromScan, 0, CELL * 3, 255, 0);
+        fill(min(r + 80, 255), min(g + 80, 255), min(b + 80, 255), flashA);
+        text(String(Math.round(lum)).padStart(3, '0'), cx, cy);
+      }
+      // Ahead of cursor (unread) — very faint static
+      else {
+        if (frameCount % 4 === 0 && random() < 0.08) {
+          // Occasional flicker of ghost data ahead of the scan
+          fill(r, g, b, 18);
+          text(String(Math.floor(random(0, 255))).padStart(3, '0'), cx, cy);
+        }
+      }
+    }
+  }
+
+  // ── Scan cursor glow line ──
+  if (phase !== 'hold') {
+    push();
+    for (let gw = 12; gw > 0; gw--) {
+      stroke(255, 255, 255, map(gw, 12, 0, 0, 30));
+      strokeWeight(gw);
+      line(scanX, 0, scanX, CANVAS_H);
+    }
+    stroke(255, 255, 255, 120);
+    strokeWeight(1);
+    drawingContext.setLineDash([2, 6]);
+    line(scanX, 0, scanX, CANVAS_H);
+    drawingContext.setLineDash([]);
+    pop();
+  }
+
+  // ── Orbital analysis rings ──
+  for (const o of orbitPoints) {
+    // Only show orbits once the scan has passed this column
+    if (o.cx > scanX && phase !== 'hold') continue;
+
+    const t  = frameCount * o.speed + o.phaseOffset;
+    const ox = o.cx + cos(t) * o.rx;
+    const oy = o.cy + sin(t) * o.ry;
+
+    push();
+    // Orbit ellipse path
+    noFill();
+    stroke(o.r, o.g, o.b, 70);
+    strokeWeight(0.6);
+    drawingContext.setLineDash([2, 5]);
+    ellipse(o.cx, o.cy, o.rx * 2, o.ry * 2);
+    drawingContext.setLineDash([]);
+
+    // Centre crosshair
+    stroke(o.r, o.g, o.b, 40);
+    strokeWeight(0.5);
+    line(o.cx - 5, o.cy, o.cx + 5, o.cy);
+    line(o.cx, o.cy - 5, o.cx, o.cy + 5);
+
+    // Orbiting dot
+    fill(o.r, o.g, o.b, 240);
+    noStroke();
+    circle(ox, oy, 4);
+
+    // Value label
+    textSize(7);
+    textAlign(LEFT, CENTER);
+    fill(o.r, o.g, o.b, 160);
+    const lum = (o.r * 0.299 + o.g * 0.587 + o.b * 0.114) / 255;
+    text(nf(lum, 1, 2), ox + 5, oy - 2);
+    pop();
+  }
+
+  // ── Horizontal guide lines from orbits to right edge ──
+  if (phase === 'hold' || scanX > CANVAS_W * 0.5) {
+    for (const o of orbitPoints) {
+      if (o.cx > scanX && phase !== 'hold') continue;
+      push();
+      stroke(o.r, o.g, o.b, 50);
+      strokeWeight(0.5);
+      drawingContext.setLineDash([3, 8]);
+      line(o.cx, o.cy, CANVAS_W, o.cy);
+      drawingContext.setLineDash([]);
+
+      // Value at right edge
+      textSize(8);
+      textAlign(LEFT, CENTER);
+      noStroke();
+      fill(o.r, o.g, o.b, 100);
+      const lum = (o.r * 0.299 + o.g * 0.587 + o.b * 0.114);
+      text(nf(lum / 255, 1, 3), CANVAS_W - 38, o.cy);
+      pop();
+    }
+  }
+
+  // ── Frame counter overlay (top-left, very faint) ──
+  push();
+  textSize(8);
+  textAlign(LEFT, TOP);
+  textFont('Courier New');
+  noStroke();
+  fill(255, 255, 255, 25);
+  text(`f:${String(frameCount).padStart(5, '0')}  x:${String(Math.round(scanX)).padStart(4, ' ')}  ${phase}`, 12, 10);
+  pop();
+}
+</script>
+</body>
+</html>

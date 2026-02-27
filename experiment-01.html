@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pixel Scanner</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+// ─── Config ──────────────────────────────────────────────────────────────────
+const IMG_FILE    = 'DSCF7641.JPG';
+const CANVAS_W    = 960;
+const CANVAS_H    = 540;
+const PANEL_W     = 220;
+const IMG_AREA_W  = CANVAS_W - PANEL_W;
+const NUM_PROBES  = 8;
+const SCAN_SPEED  = 1.0;
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let img;
+let scanX = 0;
+let probes = [];      // live sample data
+let history = [];     // fading scan trails
+
+function preload() {
+  img = loadImage(IMG_FILE);
+}
+
+function setup() {
+  createCanvas(CANVAS_W, CANVAS_H);
+  img.loadPixels();
+  textFont('monospace');
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function setDash(pattern) {
+  drawingContext.setLineDash(pattern);
+}
+
+function samplePixel(imgX, imgY) {
+  const x = constrain(Math.floor(imgX), 0, img.width  - 1);
+  const y = constrain(Math.floor(imgY), 0, img.height - 1);
+  const i = (y * img.width + x) * 4;
+  return [img.pixels[i], img.pixels[i+1], img.pixels[i+2]];
+}
+
+function saturation(r, g, b) {
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  return mx === 0 ? 0 : (mx - mn) / mx;
+}
+
+// ─── Draw ─────────────────────────────────────────────────────────────────────
+function draw() {
+  background(0);
+
+  // --- Image letterboxed into left area ---
+  const scale   = Math.min(IMG_AREA_W / img.width, CANVAS_H / img.height);
+  const drawW   = img.width  * scale;
+  const drawH   = img.height * scale;
+  const imgOffX = (IMG_AREA_W - drawW) / 2;
+  const imgOffY = (CANVAS_H   - drawH) / 2;
+
+  image(img, imgOffX, imgOffY, drawW, drawH);
+
+  // --- Map scanX (screen) → image coords ---
+  const normX      = (scanX - imgOffX) / drawW;           // 0..1 across image
+  const imgScanX   = normX * img.width;
+  const screenScanX = imgOffX + normX * drawW;
+
+  // --- Sample probes this frame ---
+  probes = [];
+  for (let i = 0; i < NUM_PROBES; i++) {
+    const normY  = (i + 0.5) / NUM_PROBES;
+    const imgY   = normY * img.height;
+    const screenY = imgOffY + normY * drawH;
+    const [r, g, b] = samplePixel(imgScanX, imgY);
+    const sat    = saturation(r, g, b);
+    probes.push({ normY, imgY, screenY, r, g, b, sat });
+  }
+
+  // --- Push scan trail entry ---
+  if (frameCount % 2 === 0) {
+    history.push({ x: screenScanX, alpha: 255, probes: probes.map(p => ({...p})) });
+  }
+
+  // --- Draw & age history ---
+  for (let h = history.length - 1; h >= 0; h--) {
+    const entry = history[h];
+    entry.alpha -= 6;
+    if (entry.alpha <= 0) { history.splice(h, 1); continue; }
+
+    push();
+    stroke(255, 255, 255, entry.alpha * 0.15);
+    strokeWeight(0.5);
+    setDash([2, 8]);
+    line(entry.x, imgOffY, entry.x, imgOffY + drawH);
+    setDash([]);
+    pop();
+  }
+
+  // --- Vertical scan cursor ---
+  push();
+  stroke(255, 255, 255, 70);
+  strokeWeight(1);
+  setDash([4, 6]);
+  line(screenScanX, imgOffY, screenScanX, imgOffY + drawH);
+  setDash([]);
+  pop();
+
+  // --- Panel separator ---
+  push();
+  stroke(255, 255, 255, 12);
+  strokeWeight(1);
+  line(IMG_AREA_W, 0, IMG_AREA_W, CANVAS_H);
+  pop();
+
+  // --- Probe lines, circles, data ---
+  const sorted = [...probes].sort((a, b) => b.sat - a.sat);
+  const orbitTargets = new Set([sorted[0], sorted[1]]);
+
+  for (const p of probes) {
+    const { screenY, r, g, b } = p;
+    const a = 130;
+
+    // Dashed guide line: probe → panel
+    push();
+    stroke(r, g, b, a);
+    strokeWeight(0.5);
+    setDash([3, 7]);
+    line(screenScanX, screenY, IMG_AREA_W, screenY);
+    setDash([]);
+    pop();
+
+    // Small circle at sample point
+    push();
+    noFill();
+    stroke(r, g, b, 200);
+    strokeWeight(1);
+    circle(screenScanX, screenY, 8);
+    pop();
+
+    // Data readout in panel — digits stacked in columns
+    const px = IMG_AREA_W + 14;
+    push();
+    textSize(9);
+    textAlign(LEFT);
+    noStroke();
+
+    // Each channel as a 3-digit string, color-coded, stacked vertically
+    const rv = String(r).padStart(3, '0');
+    const gv = String(g).padStart(3, '0');
+    const bv = String(b).padStart(3, '0');
+
+    fill(min(r + 80, 255), 60, 60);
+    text(rv, px,      screenY - 4);
+    fill(60, min(g + 80, 255), 60);
+    text(gv, px + 28, screenY - 4);
+    fill(60, 60, min(b + 80, 255));
+    text(bv, px + 56, screenY - 4);
+
+    // Luminance value small, below
+    fill(r, g, b, 100);
+    textSize(7);
+    text(nf((r * 0.299 + g * 0.587 + b * 0.114) / 255, 1, 2), px, screenY + 6);
+    pop();
+  }
+
+  // --- Orbiting rings at 2 most saturated probes ---
+  let orbitIdx = 0;
+  for (const p of orbitTargets) {
+    const { screenY, r, g, b } = p;
+    const dir = orbitIdx === 0 ? 1 : -1.4;
+    const t   = frameCount * 0.022 * dir;
+    const rx  = 16 + orbitIdx * 6;
+    const ry  = 9  + orbitIdx * 4;
+
+    // Ellipse path
+    push();
+    noFill();
+    stroke(r, g, b, 80);
+    strokeWeight(0.7);
+    setDash([2, 5]);
+    ellipse(screenScanX, screenY, rx * 2, ry * 2);
+    setDash([]);
+    pop();
+
+    // Orbiting dot
+    const ox = screenScanX + cos(t) * rx;
+    const oy = screenY     + sin(t) * ry;
+    push();
+    fill(r, g, b, 230);
+    noStroke();
+    circle(ox, oy, 3.5);
+
+    // Value label near dot
+    textFont('monospace');
+    textSize(7.5);
+    fill(r, g, b, 180);
+    noStroke();
+    text(nf((r * 0.299 + g * 0.587 + b * 0.114) / 255, 1, 2), ox + 4, oy - 2);
+    pop();
+
+    orbitIdx++;
+  }
+
+  // --- Advance scan (wraps at image right edge, restarts at left) ---
+  scanX += SCAN_SPEED;
+  if (scanX > imgOffX + drawW) scanX = imgOffX;
+}
+</script>
+</body>
+</html>
