@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Kaleidoscope — 11</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; cursor: none; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; cursor: pointer; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE = 'DSCF7641.JPG';
+const CANVAS_W = 900;
+const CANVAS_H = 540;
+
+let img;
+let imgOffX, imgOffY, drawW, drawH;
+let segments   = 8;     // number of mirror segments (click cycles: 6/8/10/12)
+let rotation   = 0;
+let zoom       = 1.0;
+let zoomDir    = 0.0008;
+const SEGMENT_COUNTS = [6, 8, 10, 12, 16];
+let segIdx = 1;
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+  imageMode(CENTER);
+
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  drawW   = img.width  * scale;
+  drawH   = img.height * scale;
+  imgOffX = 0;
+  imgOffY = 0;
+}
+
+function mousePressed() {
+  segIdx   = (segIdx + 1) % SEGMENT_COUNTS.length;
+  segments = SEGMENT_COUNTS[segIdx];
+}
+
+function draw() {
+  background(0);
+
+  // Mouse X controls rotation speed, Y controls zoom target
+  const rotSpeed  = map(mouseX, 0, CANVAS_W, -0.006, 0.006);
+  const zoomTarget = map(mouseY, 0, CANVAS_H, 1.6, 0.65);
+  zoom = lerp(zoom, zoomTarget, 0.015);
+
+  rotation += rotSpeed;
+
+  const cx = CANVAS_W / 2;
+  const cy = CANVAS_H / 2;
+  const wedgeAngle = TWO_PI / segments;
+  const R = max(CANVAS_W, CANVAS_H) * 0.75;
+
+  // Draw each segment
+  for (let i = 0; i < segments; i++) {
+    drawingContext.save();
+    drawingContext.translate(cx, cy);
+    drawingContext.rotate(i * wedgeAngle + rotation);
+
+    // Clip to wedge shape
+    drawingContext.beginPath();
+    drawingContext.moveTo(0, 0);
+    drawingContext.arc(0, 0, R, 0, wedgeAngle);
+    drawingContext.closePath();
+    drawingContext.clip();
+
+    // Mirror every other segment (creates true kaleidoscope reflection)
+    if (i % 2 === 1) {
+      drawingContext.rotate(wedgeAngle);
+      drawingContext.scale(1, -1);
+    }
+
+    // Draw the image centred at origin, scaled
+    drawingContext.scale(zoom, zoom);
+    drawImage(0, 0);
+
+    drawingContext.restore();
+  }
+
+  // Subtle vignette
+  push();
+  noStroke();
+  const grad = drawingContext.createRadialGradient(cx, cy, 0, cx, cy, R * 0.9);
+  grad.addColorStop(0,   'rgba(0,0,0,0)');
+  grad.addColorStop(0.7, 'rgba(0,0,0,0)');
+  grad.addColorStop(1,   'rgba(0,0,0,0.7)');
+  drawingContext.fillStyle = grad;
+  drawingContext.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  pop();
+
+  // Segment label
+  push();
+  textFont('Courier New');
+  textSize(8);
+  textAlign(LEFT, BOTTOM);
+  noStroke();
+  fill(255, 255, 255, 20);
+  text(`${segments} segments — click to change`, 12, CANVAS_H - 10);
+  pop();
+}
+
+// Draw image centred at the current transform origin
+function drawImage(x, y) {
+  drawingContext.drawImage(
+    img.canvas ?? img.elt,
+    x - drawW / 2,
+    y - drawH / 2,
+    drawW,
+    drawH
+  );
+}
+</script>
+</body>
+</html>
