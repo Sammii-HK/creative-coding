@@ -30,6 +30,7 @@ function preload() { img = loadImage(IMG_FILE); }
 function setup() {
   pixelDensity(1);
   createCanvas(CANVAS_W, CANVAS_H);
+  img.loadPixels();
 
   const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
   drawW = img.width  * scale;
@@ -39,6 +40,27 @@ function setup() {
 
   lx = CANVAS_W / 2;
   ly = CANVAS_H / 2;
+}
+
+// Sample the image at a canvas-space position, returns [r, g, b]
+function sampleImg(x, y) {
+  const ix = constrain(floor((x - offX) / drawW * img.width),  0, img.width  - 1);
+  const iy = constrain(floor((y - offY) / drawH * img.height), 0, img.height - 1);
+  const i  = (iy * img.width + ix) * 4;
+  return [img.pixels[i], img.pixels[i + 1], img.pixels[i + 2]];
+}
+
+// Boost a sampled colour: push saturation away from grey, lift brightness
+function amplify(r, g, b) {
+  const lum = r * 0.299 + g * 0.587 + b * 0.114;
+  const SAT = 2.8, LUM = 1.5;
+  r = constrain(lum + (r - lum) * SAT, 0, 255) * LUM;
+  g = constrain(lum + (g - lum) * SAT, 0, 255) * LUM;
+  b = constrain(lum + (b - lum) * SAT, 0, 255) * LUM;
+  // Clamp to 255
+  const mx = max(r, g, b);
+  if (mx > 255) { const s = 255 / mx; r *= s; g *= s; b *= s; }
+  return [r, g, b];
 }
 
 function draw() {
@@ -105,88 +127,81 @@ function draw() {
 }
 
 function drawBubbleRim(dc, cx, cy, r) {
-  const t = frameCount * 0.4;  // colour-shift speed
+  const SEGS  = 180;
+  const RIM_W = 20;
+  const TWO_PI = Math.PI * 2;
 
-  // ── Layer A: wide iridescent band ──
-  // Painted as many short arc segments, each a different slowly-shifting hue.
-  // Two passes with different hue offsets create the layered soap-film look.
-  const SEGS  = 200;
-  const RIM_W = 18;
+  // ── Layer A: outer glow — sampled from just outside the lens ──
+  // Amplified image colours bleed outward like light scattering through glass.
+  for (let i = 0; i < SEGS; i++) {
+    const a0 = (i       / SEGS) * TWO_PI;
+    const a1 = ((i + 1) / SEGS) * TWO_PI + 0.02;
+    const aMid = (i + 0.5) / SEGS * TWO_PI;
+    // Sample the image ~half a rim-width outside the lens boundary
+    const sx = cx + (r + RIM_W * 0.6) * Math.cos(aMid);
+    const sy = cy + (r + RIM_W * 0.6) * Math.sin(aMid);
+    const [sr, sg, sb] = amplify(...sampleImg(sx, sy));
 
-  for (let pass = 0; pass < 2; pass++) {
-    const hueOffset = pass === 0 ? 0 : 140;
-    const radiusOff = pass === 0 ? 0 : -RIM_W * 0.35;
-    const alphaBase = pass === 0 ? 0.55 : 0.28;
-
-    for (let i = 0; i < SEGS; i++) {
-      const a0  = (i       / SEGS) * Math.PI * 2;
-      const a1  = ((i + 1) / SEGS) * Math.PI * 2 + 0.03;  // slight overlap
-      // Hue cycles around the rim + drifts over time
-      const hue = (i / SEGS * 360 + t + hueOffset) % 360;
-      // Saturation pulses gently
-      const sat = 75 + 20 * Math.sin(i / SEGS * Math.PI * 6 + t * 0.3);
-
-      dc.beginPath();
-      dc.arc(cx, cy, r + radiusOff, a0, a1);
-      dc.strokeStyle = `hsla(${hue}, ${sat}%, 72%, ${alphaBase})`;
-      dc.lineWidth = RIM_W;
-      dc.stroke();
-    }
+    dc.beginPath();
+    dc.arc(cx, cy, r + RIM_W * 0.3, a0, a1);
+    dc.strokeStyle = `rgba(${sr|0},${sg|0},${sb|0},0.55)`;
+    dc.lineWidth = RIM_W;
+    dc.stroke();
   }
 
-  // ── Layer B: thin bright inner rim ──
-  dc.beginPath();
-  dc.arc(cx, cy, r - RIM_W * 0.5, 0, Math.PI * 2);
-  dc.strokeStyle = 'rgba(255,255,255,0.12)';
-  dc.lineWidth = 2.5;
-  dc.stroke();
+  // ── Layer B: inner colour bleed — sampled from just inside the lens ──
+  // Picks up the magnified image colours right at the edge, adds warm glow.
+  for (let i = 0; i < SEGS; i++) {
+    const a0 = (i       / SEGS) * TWO_PI;
+    const a1 = ((i + 1) / SEGS) * TWO_PI + 0.02;
+    const aMid = (i + 0.5) / SEGS * TWO_PI;
+    const sx = cx + (r - RIM_W * 0.5) * Math.cos(aMid);
+    const sy = cy + (r - RIM_W * 0.5) * Math.sin(aMid);
+    const [sr, sg, sb] = amplify(...sampleImg(sx, sy));
 
-  // ── Layer C: thin outer rim ──
+    dc.beginPath();
+    dc.arc(cx, cy, r - RIM_W * 0.2, a0, a1);
+    dc.strokeStyle = `rgba(${sr|0},${sg|0},${sb|0},0.35)`;
+    dc.lineWidth = RIM_W * 0.6;
+    dc.stroke();
+  }
+
+  // ── Layer C: thin bright inner rim line ──
   dc.beginPath();
-  dc.arc(cx, cy, r + RIM_W * 0.45, 0, Math.PI * 2);
-  dc.strokeStyle = 'rgba(255,255,255,0.08)';
+  dc.arc(cx, cy, r - RIM_W * 0.55, 0, TWO_PI);
+  dc.strokeStyle = 'rgba(255,255,255,0.14)';
   dc.lineWidth = 2;
   dc.stroke();
 
-  // ── Layer D: specular highlight — bright crescent top-left ──
-  // Mimics a light source hitting the curved glass surface.
+  // ── Layer D: thin outer rim line ──
+  dc.beginPath();
+  dc.arc(cx, cy, r + RIM_W * 0.5, 0, TWO_PI);
+  dc.strokeStyle = 'rgba(255,255,255,0.07)';
+  dc.lineWidth = 2;
+  dc.stroke();
+
+  // ── Layer E: specular highlight — bright crescent top-left ──
   dc.save();
+  dc.lineCap = 'round';
   dc.beginPath();
   dc.arc(cx, cy, r - 3, -2.5, -0.65);
-  dc.strokeStyle = 'rgba(255,255,255,0.75)';
+  dc.strokeStyle = 'rgba(255,255,255,0.78)';
   dc.lineWidth = 3.5;
-  dc.lineCap = 'round';
   dc.stroke();
-  // Softer outer glow of the same arc
   dc.beginPath();
   dc.arc(cx, cy, r + 2, -2.5, -0.65);
-  dc.strokeStyle = 'rgba(255,255,255,0.15)';
-  dc.lineWidth = 8;
+  dc.strokeStyle = 'rgba(255,255,255,0.14)';
+  dc.lineWidth = 9;
   dc.stroke();
   dc.restore();
 
-  // ── Layer E: small secondary specular bottom-right ──
+  // ── Layer F: small secondary specular bottom-right ──
   dc.save();
+  dc.lineCap = 'round';
   dc.beginPath();
   dc.arc(cx, cy, r - 4, 0.9, 1.7);
-  dc.strokeStyle = 'rgba(255,255,255,0.22)';
+  dc.strokeStyle = 'rgba(255,255,255,0.2)';
   dc.lineWidth = 2.5;
-  dc.lineCap = 'round';
-  dc.stroke();
-  dc.restore();
-
-  // ── Layer F: chromatic fringe just inside the rim ──
-  // Red bleeds slightly outward, blue inward — like a real lens edge.
-  dc.save();
-  dc.beginPath();
-  dc.arc(cx, cy, r - RIM_W - 1, 0, Math.PI * 2);
-  dc.strokeStyle = 'rgba(100,180,255,0.18)';
-  dc.lineWidth = 4;
-  dc.stroke();
-  dc.beginPath();
-  dc.arc(cx, cy, r + RIM_W * 0.55 + 2, 0, Math.PI * 2);
-  dc.strokeStyle = 'rgba(255,100,80,0.14)';
-  dc.lineWidth = 4;
   dc.stroke();
   dc.restore();
 }
