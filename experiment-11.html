@@ -21,12 +21,22 @@ const CANVAS_H = 540;
 
 let img;
 let imgOffX, imgOffY, drawW, drawH;
-let segments   = 8;     // number of mirror segments (click cycles: 6/8/10/12)
+let segments   = 8;
 let rotation   = 0;
 let zoom       = 1.0;
-let zoomDir    = 0.0008;
 const SEGMENT_COUNTS = [6, 8, 10, 12, 16];
 let segIdx = 1;
+
+// Autonomous slow pan — Lissajous drift across the image surface
+// Different x/y frequencies so the path never quite repeats
+const PAN_AMP_X  = 200;   // max pixel offset (image space)
+const PAN_AMP_Y  = 140;
+const PAN_FREQ_X = 0.0055;
+const PAN_FREQ_Y = 0.0083;
+
+// Autonomous zoom pulse layered on top of mouse zoom
+const AUTO_ZOOM_AMP  = 0.18;
+const AUTO_ZOOM_FREQ = 0.008;
 
 function preload() { img = loadImage(IMG_FILE); }
 
@@ -51,9 +61,17 @@ function draw() {
   background(0);
 
   // Mouse X controls rotation speed, Y controls zoom target
-  const rotSpeed  = map(mouseX, 0, CANVAS_W, -0.006, 0.006);
+  const rotSpeed   = map(mouseX, 0, CANVAS_W, -0.006, 0.006);
   const zoomTarget = map(mouseY, 0, CANVAS_H, 1.6, 0.65);
   zoom = lerp(zoom, zoomTarget, 0.015);
+
+  // Autonomous pan — Lissajous drift
+  const t    = frameCount;
+  const panX = sin(t * PAN_FREQ_X) * PAN_AMP_X;
+  const panY = cos(t * PAN_FREQ_Y) * PAN_AMP_Y;
+
+  // Autonomous zoom pulse layered on top of mouse zoom
+  const autoZoom = 1.0 + sin(t * AUTO_ZOOM_FREQ) * AUTO_ZOOM_AMP;
 
   rotation += rotSpeed;
 
@@ -81,9 +99,9 @@ function draw() {
       drawingContext.scale(1, -1);
     }
 
-    // Draw the image centred at origin, scaled
-    drawingContext.scale(zoom, zoom);
-    drawImage(0, 0);
+    // Scale (mouse zoom × auto pulse), then pan the sample origin
+    drawingContext.scale(zoom * autoZoom, zoom * autoZoom);
+    drawImage(panX, panY);
 
     drawingContext.restore();
   }
