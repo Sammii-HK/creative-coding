@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pixel Sort — 09</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE   = 'DSCF7641.JPG';
+const CANVAS_W   = 900;
+const CANVAS_H   = 540;
+const SCAN_SPEED = 3.0;
+
+// Sort modes cycle on each pass
+const SORT_MODES = ['lum-desc', 'lum-asc', 'red', 'blue', 'sat'];
+let modeIndex = 0;
+
+let img;
+let origGfx;
+let sortedGfx;
+let scanX  = 0;
+let phase  = 'reveal';  // reveal | hold-sorted | unsort | hold-orig
+let holdTimer = 0;
+const HOLD_FRAMES = 90;
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+
+  // Render original image into a graphics buffer
+  origGfx = createGraphics(CANVAS_W, CANVAS_H);
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  const drawW = img.width * scale, drawH = img.height * scale;
+  const offX  = (CANVAS_W - drawW) / 2, offY = (CANVAS_H - drawH) / 2;
+  origGfx.image(img, offX, offY, drawW, drawH);
+
+  sortedGfx = createGraphics(CANVAS_W, CANVAS_H);
+  buildSorted(SORT_MODES[modeIndex]);
+}
+
+function sortKey(r, g, b, mode) {
+  switch (mode) {
+    case 'lum-desc': return -(r * 0.299 + g * 0.587 + b * 0.114);
+    case 'lum-asc':  return  (r * 0.299 + g * 0.587 + b * 0.114);
+    case 'red':      return -r;
+    case 'blue':     return -b;
+    case 'sat': {
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      return -(mx === 0 ? 0 : (mx - mn) / mx);
+    }
+  }
+}
+
+function buildSorted(mode) {
+  origGfx.loadPixels();
+  sortedGfx.loadPixels();
+
+  for (let x = 0; x < CANVAS_W; x++) {
+    // Extract column
+    const col = [];
+    for (let y = 0; y < CANVAS_H; y++) {
+      const i = (y * CANVAS_W + x) * 4;
+      col.push([
+        origGfx.pixels[i],
+        origGfx.pixels[i + 1],
+        origGfx.pixels[i + 2],
+        origGfx.pixels[i + 3],
+      ]);
+    }
+
+    // Sort — only sort pixels that aren't transparent (in the image area)
+    col.sort((a, b) => {
+      // Keep fully transparent at bottom
+      if (a[3] < 10 && b[3] < 10) return 0;
+      if (a[3] < 10) return 1;
+      if (b[3] < 10) return -1;
+      return sortKey(a[0], a[1], a[2], mode) - sortKey(b[0], b[1], b[2], mode);
+    });
+
+    // Write sorted column into sortedGfx
+    for (let y = 0; y < CANVAS_H; y++) {
+      const i = (y * CANVAS_W + x) * 4;
+      sortedGfx.pixels[i]     = col[y][0];
+      sortedGfx.pixels[i + 1] = col[y][1];
+      sortedGfx.pixels[i + 2] = col[y][2];
+      sortedGfx.pixels[i + 3] = col[y][3];
+    }
+  }
+
+  sortedGfx.updatePixels();
+}
+
+function draw() {
+  background(0);
+
+  // ── Phase machine ──
+  if (phase === 'reveal') {
+    scanX += SCAN_SPEED;
+    if (scanX >= CANVAS_W) { scanX = CANVAS_W; phase = 'hold-sorted'; holdTimer = 0; }
+  } else if (phase === 'hold-sorted') {
+    holdTimer++;
+    if (holdTimer >= HOLD_FRAMES) { phase = 'unsort'; }
+  } else if (phase === 'unsort') {
+    scanX -= SCAN_SPEED;
+    if (scanX <= 0) {
+      scanX = 0;
+      phase = 'hold-orig';
+      holdTimer = 0;
+      // Advance sort mode for next cycle
+      modeIndex = (modeIndex + 1) % SORT_MODES.length;
+      buildSorted(SORT_MODES[modeIndex]);
+    }
+  } else {
+    holdTimer++;
+    if (holdTimer >= HOLD_FRAMES) { phase = 'reveal'; }
+  }
+
+  // ── Composite: sorted left, original right ──
+  image(origGfx, 0, 0);
+  if (scanX > 0) {
+    copy(sortedGfx, 0, 0, scanX, CANVAS_H, 0, 0, scanX, CANVAS_H);
+  }
+
+  // ── Scan cursor ──
+  if (phase === 'reveal' || phase === 'unsort') {
+    push();
+    for (let gw = 12; gw > 0; gw -= 2) {
+      stroke(255, 255, 255, map(gw, 12, 0, 0, 20));
+      strokeWeight(gw);
+      line(scanX, 0, scanX, CANVAS_H);
+    }
+    stroke(255, 255, 255, 90);
+    strokeWeight(1);
+    drawingContext.setLineDash([2, 5]);
+    line(scanX, 0, scanX, CANVAS_H);
+    drawingContext.setLineDash([]);
+    pop();
+  }
+
+  // ── Mode label ──
+  push();
+  textFont('Courier New');
+  textSize(8);
+  textAlign(LEFT, BOTTOM);
+  noStroke();
+  fill(255, 255, 255, 25);
+  text(`sort: ${SORT_MODES[modeIndex]}`, 12, CANVAS_H - 10);
+  pop();
+}
+</script>
+</body>
+</html>
