@@ -106,7 +106,7 @@ function buildCellGrid() {
       const lum = r * 0.299 + g * 0.587 + b * 0.114;
 
       // Boost dark pixels so they're visible on black bg
-      const boost = map(lum, 0, 255, 110, 0);
+      const boost = map(lum, 0, 255, 160, 20);
       const dr = min(r + boost, 255);
       const dg = min(g + boost, 255);
       const db = min(b + boost, 255);
@@ -120,6 +120,8 @@ function buildCellGrid() {
         or: r,  og: g,  ob: b, // original color (for orbits)
         lum,
         val: hexVal,
+        revealFrame: -1,                              // set when scan cursor first passes
+        scrambleDuration: floor(random(10, 50)),      // each cell settles at its own pace
         // Saturation for orbit picking
         sat: (() => {
           const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
@@ -164,8 +166,18 @@ function draw() {
     if (holdTimer >= HOLD_FRAMES) phase = 'collapse';
   } else {
     scanX -= SCAN_SPEED * 1.5;
-    if (scanX <= -CELL) { phase = 'reveal'; scanX = -CELL; }
+    if (scanX <= -CELL) {
+      phase = 'reveal';
+      scanX = -CELL;
+      // Reset scramble state for next cycle with fresh random durations
+      for (const c of cellGrid) {
+        c.revealFrame = -1;
+        c.scrambleDuration = floor(random(10, 50));
+      }
+    }
   }
+
+  // Each cell has its own scrambleDuration — no constant needed here
 
   // ── Number grid ──
   textSize(CELL - 2);
@@ -176,15 +188,33 @@ function draw() {
     const d = c.cx - scanX;
 
     if (d < 0) {
-      // Revealed: alpha scales with luminance but floored at 70
-      const a = map(c.lum, 0, 255, 70, 210);
-      fill(c.r, c.g, c.b, a);
-      text(c.val, c.cx, c.cy);
+      // Mark the moment this cell was first revealed
+      if (c.revealFrame === -1) c.revealFrame = frameCount;
+
+      const elapsed = frameCount - c.revealFrame;
+      const a = map(c.lum, 0, 255, 120, 240);
+
+      if (elapsed < c.scrambleDuration) {
+        // Scrambling — probability of showing final value increases over time
+        // so it "decelerates" into the correct char
+        const settlePct = elapsed / c.scrambleDuration;
+        const showFinal = random() < (settlePct * settlePct); // ease-in curve
+        const ch = showFinal ? c.val : Math.floor(random(16)).toString(16);
+        // Slightly brighter while scrambling
+        const boost = map(elapsed, 0, c.scrambleDuration, 60, 0);
+        fill(min(c.r + boost, 255), min(c.g + boost, 255), min(c.b + boost, 255), a);
+        text(ch, c.cx, c.cy);
+      } else {
+        // Settled on final value
+        fill(c.r, c.g, c.b, a);
+        text(c.val, c.cx, c.cy);
+      }
+
     } else if (d < CELL * 4) {
       // Flash at cursor edge
       const flashA = map(d, 0, CELL * 4, 255, 0);
-      fill(min(c.r + 60, 255), min(c.g + 60, 255), min(c.b + 60, 255), flashA);
-      text(c.val, c.cx, c.cy);
+      fill(min(c.r + 80, 255), min(c.g + 80, 255), min(c.b + 80, 255), flashA);
+      text(Math.floor(random(16)).toString(16), c.cx, c.cy);
     } else {
       // Ahead of cursor: occasional ghost flicker
       if (random() < 0.004) {
