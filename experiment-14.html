@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Depth Field — 14</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; cursor: none; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; cursor: pointer; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE     = 'DSCF7641.JPG';
+const CANVAS_W     = 900;
+const CANVAS_H     = 540;
+const NUM_BOKEH    = 1800;   // bokeh discs
+const CELL         = 9;      // sample grid size
+
+let img;
+let offX, offY, drawW, drawH;
+let imgColors = [];  // [col][row] = [r, g, b]
+let COLS, ROWS;
+
+let focusX, focusY;   // smooth focus point (follows mouse)
+let bokeh  = [];
+const FOCUS_RADIUS = 160;    // px — region that stays sharp
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+  img.loadPixels();
+
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  drawW = img.width  * scale;
+  drawH = img.height * scale;
+  offX  = (CANVAS_W - drawW) / 2;
+  offY  = (CANVAS_H - drawH) / 2;
+
+  COLS = floor(CANVAS_W / CELL);
+  ROWS = floor(CANVAS_H / CELL);
+
+  // Pre-sample image colours at grid positions
+  for (let col = 0; col < COLS; col++) {
+    imgColors[col] = [];
+    for (let row = 0; row < ROWS; row++) {
+      const cx = col * CELL + CELL / 2;
+      const cy = row * CELL + CELL / 2;
+      const ix = constrain(floor((cx - offX) / drawW * img.width),  0, img.width  - 1);
+      const iy = constrain(floor((cy - offY) / drawH * img.height), 0, img.height - 1);
+      const i  = (iy * img.width + ix) * 4;
+      imgColors[col][row] = [img.pixels[i], img.pixels[i + 1], img.pixels[i + 2]];
+    }
+  }
+
+  // Spawn bokeh particles
+  for (let i = 0; i < NUM_BOKEH; i++) {
+    bokeh.push(makeBokeh());
+  }
+
+  focusX = CANVAS_W / 2;
+  focusY = CANVAS_H / 2;
+}
+
+function makeBokeh(fx, fy) {
+  // Spawn anywhere, but bias toward outside the focus zone
+  const x = random(CANVAS_W);
+  const y = random(CANVAS_H);
+
+  const col = constrain(floor(x / CELL), 0, COLS - 1);
+  const row = constrain(floor(y / CELL), 0, ROWS - 1);
+  const [r, g, b] = imgColors[col][row];
+
+  return {
+    x, y,
+    r, g, b,
+    // Each bokeh disc has a base size — how large it spreads when out of focus
+    baseSize: random(3, 22),
+    // Drift velocity (slow float)
+    vx: random(-0.08, 0.08),
+    vy: random(-0.08, 0.08),
+    // Random alpha ceiling
+    maxAlpha: random(80, 200),
+  };
+}
+
+function draw() {
+  background(0);
+
+  // Lerp focus toward mouse
+  focusX = lerp(focusX, mouseX, 0.04);
+  focusY = lerp(focusY, mouseY, 0.04);
+
+  // ── Draw original image, darkened ──
+  push();
+  tint(80);
+  image(img, offX, offY, drawW, drawH);
+  noTint();
+  pop();
+
+  // ── Bokeh discs ──
+  noStroke();
+  for (const p of bokeh) {
+    // Drift
+    p.x += p.vx;
+    p.y += p.vy;
+    // Soft wrap
+    if (p.x < -30)          p.x = CANVAS_W + 30;
+    if (p.x > CANVAS_W + 30) p.x = -30;
+    if (p.y < -30)          p.y = CANVAS_H + 30;
+    if (p.y > CANVAS_H + 30) p.y = -30;
+
+    // Distance from focus point
+    const d   = dist(p.x, p.y, focusX, focusY);
+    // 0 = in focus, 1 = fully blurred
+    const blur = constrain((d - FOCUS_RADIUS * 0.4) / (FOCUS_RADIUS * 1.2), 0, 1);
+
+    // Size: small when in focus, large bokeh disc when out
+    const sz = lerp(1.5, p.baseSize, blur);
+
+    // Alpha: fully opaque in focus, semi-transparent large disc when blurred
+    const alpha = lerp(p.maxAlpha, p.maxAlpha * 0.18, blur);
+
+    fill(p.r, p.g, p.b, alpha);
+    circle(p.x, p.y, sz * 2);
+  }
+
+  // ── Sharp circle at focus — resample and draw crisp pixels ──
+  drawSharpRegion();
+
+  // ── Focus ring cursor ──
+  push();
+  noFill();
+  stroke(255, 255, 255, 30);
+  strokeWeight(0.8);
+  drawingContext.setLineDash([3, 6]);
+  circle(focusX, focusY, FOCUS_RADIUS * 2);
+  drawingContext.setLineDash([]);
+
+  // Tiny centre dot
+  noStroke();
+  fill(255, 255, 255, 60);
+  circle(focusX, focusY, 4);
+  pop();
+
+  // ── Label ──
+  push();
+  textFont('Courier New');
+  textSize(8);
+  textAlign(LEFT, BOTTOM);
+  noStroke();
+  fill(255, 255, 255, 18);
+  text('depth of field — move mouse to shift focus', 12, CANVAS_H - 10);
+  pop();
+}
+
+function drawSharpRegion() {
+  // Draw full image clipped to focus circle with full brightness
+  drawingContext.save();
+  drawingContext.beginPath();
+  drawingContext.arc(focusX, focusY, FOCUS_RADIUS, 0, Math.PI * 2);
+  drawingContext.clip();
+  drawingContext.drawImage(img.canvas ?? img.elt, offX, offY, drawW, drawH);
+  drawingContext.restore();
+
+  // Soft edge fade — radial gradient overlay to blend into blurred region
+  push();
+  noStroke();
+  const grad = drawingContext.createRadialGradient(
+    focusX, focusY, FOCUS_RADIUS * 0.55,
+    focusX, focusY, FOCUS_RADIUS
+  );
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,1)');
+  drawingContext.fillStyle = grad;
+  drawingContext.beginPath();
+  drawingContext.arc(focusX, focusY, FOCUS_RADIUS, 0, Math.PI * 2);
+  drawingContext.fill();
+  pop();
+}
+</script>
+</body>
+</html>
