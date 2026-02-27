@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Particle Burst — 06</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; cursor: pointer; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; cursor: pointer; }
+    #back:hover { color: #555; }
+    #hint { font-family: 'Courier New', monospace; font-size: 8px; letter-spacing: 0.15em; color: #1a1a1a; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE    = 'DSCF7641.JPG';
+const CANVAS_W    = 900;
+const CANVAS_H    = 540;
+const NUM_PARTICLES = 5000;
+const SPRING_K    = 0.035;  // spring stiffness toward home
+const DAMPING     = 0.88;   // velocity damping
+const BURST_FORCE = 18;     // explosion strength on click/load
+
+let img;
+let particles = [];
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+  img.loadPixels();
+  buildParticles();
+  burst();   // initial explosion
+}
+
+function buildParticles() {
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  const drawW = img.width * scale, drawH = img.height * scale;
+  const offX  = (CANVAS_W - drawW) / 2, offY = (CANVAS_H - drawH) / 2;
+
+  // Sample evenly across image
+  const gridCols = ceil(sqrt(NUM_PARTICLES * (CANVAS_W / CANVAS_H)));
+  const gridRows = ceil(NUM_PARTICLES / gridCols);
+
+  for (let gr = 0; gr < gridRows; gr++) {
+    for (let gc = 0; gc < gridCols; gc++) {
+      if (particles.length >= NUM_PARTICLES) break;
+
+      const nx = (gc + 0.5) / gridCols;
+      const ny = (gr + 0.5) / gridRows;
+
+      const hx = nx * CANVAS_W;
+      const hy = ny * CANVAS_H;
+
+      // Map to image pixel
+      const ix = constrain(floor((hx - offX) / drawW * img.width),  0, img.width  - 1);
+      const iy = constrain(floor((hy - offY) / drawH * img.height), 0, img.height - 1);
+      const i  = (iy * img.width + ix) * 4;
+      const r  = img.pixels[i], g = img.pixels[i+1], b = img.pixels[i+2];
+      const lum = r * 0.299 + g * 0.587 + b * 0.114;
+
+      // Skip very dark (background) particles — keep it focused
+      if (lum < 12) continue;
+
+      particles.push({
+        hx, hy,       // home
+        x:  hx, y: hy, // current
+        vx: 0, vy: 0,
+        r, g, b,
+        size: map(lum, 0, 255, 0.8, 2.2),
+      });
+    }
+  }
+}
+
+function burst() {
+  const cx = CANVAS_W / 2, cy = CANVAS_H / 2;
+  for (const p of particles) {
+    const angle = atan2(p.hy - cy, p.hx - cx) + random(-0.6, 0.6);
+    const force = random(BURST_FORCE * 0.3, BURST_FORCE);
+    p.vx += cos(angle) * force;
+    p.vy += sin(angle) * force;
+  }
+}
+
+function mousePressed() {
+  // Re-burst from mouse position
+  for (const p of particles) {
+    const angle = atan2(p.y - mouseY, p.x - mouseX) + random(-0.4, 0.4);
+    const d     = dist(mouseX, mouseY, p.x, p.y);
+    const force = map(d, 0, 400, BURST_FORCE * 1.5, BURST_FORCE * 0.2);
+    p.vx += cos(angle) * force;
+    p.vy += sin(angle) * force;
+  }
+}
+
+function draw() {
+  // Fade trail
+  noStroke();
+  fill(0, 0, 0, 35);
+  rect(0, 0, CANVAS_W, CANVAS_H);
+
+  noStroke();
+  for (const p of particles) {
+    // Spring toward home
+    p.vx += (p.hx - p.x) * SPRING_K;
+    p.vy += (p.hy - p.y) * SPRING_K;
+
+    // Damping
+    p.vx *= DAMPING;
+    p.vy *= DAMPING;
+
+    // Move
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // Velocity-based brightness boost (fast = brighter)
+    const speed = sqrt(p.vx * p.vx + p.vy * p.vy);
+    const boost = map(speed, 0, 8, 0, 80);
+    const alpha = map(speed, 0, 3, 180, 255);
+
+    fill(
+      min(p.r + boost, 255),
+      min(p.g + boost, 255),
+      min(p.b + boost, 255),
+      alpha
+    );
+    circle(p.x, p.y, p.size + map(speed, 0, 8, 0, 1.5));
+  }
+}
+</script>
+</body>
+</html>

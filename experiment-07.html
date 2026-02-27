@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Waveform — 07</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE = 'DSCF7641.JPG';
+const CANVAS_W = 900;
+const CANVAS_H = 540;
+const STRIP_H  = 2;   // height of each horizontal slice in px
+const CELL     = 12;  // size for data overlay grid
+
+let img;
+let imgOffX, imgOffY, drawW, drawH;
+
+// Data probe overlay (like experiment-01 but on top of the waveform)
+let probeGrid = [];   // pre-sampled probe colours
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+  img.loadPixels();
+
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  drawW   = img.width  * scale;
+  drawH   = img.height * scale;
+  imgOffX = (CANVAS_W - drawW) / 2;
+  imgOffY = (CANVAS_H - drawH) / 2;
+
+  buildProbes();
+}
+
+function buildProbes() {
+  const NUM_H = floor(CANVAS_H / CELL);
+  for (let row = 0; row < NUM_H; row++) {
+    probeGrid[row] = [];
+    const cy = row * CELL + CELL / 2;
+    for (let scanCol = 0; scanCol < floor(CANVAS_W / CELL); scanCol++) {
+      const cx = scanCol * CELL + CELL / 2;
+      const ix = constrain(floor((cx - imgOffX) / drawW * img.width),  0, img.width  - 1);
+      const iy = constrain(floor((cy - imgOffY) / drawH * img.height), 0, img.height - 1);
+      const i  = (iy * img.width + ix) * 4;
+      probeGrid[row][scanCol] = [img.pixels[i], img.pixels[i+1], img.pixels[i+2]];
+    }
+  }
+}
+
+function draw() {
+  background(0);
+
+  const t = frameCount * 0.018;
+
+  // ── Draw image as displaced horizontal strips ──
+  for (let sy = 0; sy < CANVAS_H; sy += STRIP_H) {
+    // Layered sine waves — each strip gets a unique offset
+    const wave1 = sin(sy * 0.022 + t        ) * 18;
+    const wave2 = sin(sy * 0.009 + t * 1.3  ) * 10;
+    const wave3 = sin(sy * 0.046 + t * 0.7  ) * 5;
+    const offsetX = wave1 + wave2 + wave3;
+
+    // Map canvas row → image row
+    const imgY = floor((sy - imgOffY) / drawH * img.height);
+    if (imgY < 0 || imgY >= img.height) continue;
+
+    // Copy a horizontal strip of the image, shifted
+    copy(
+      img,
+      0,                imgY,
+      img.width,        max(1, floor(STRIP_H / drawH * img.height)),
+      imgOffX + offsetX, sy,
+      drawW,            STRIP_H
+    );
+  }
+
+  // ── Scanline overlay — horizontal highlight lines ──
+  // Pulse a few luminous scan lines across the frame
+  for (let i = 0; i < 3; i++) {
+    const scanY = (frameCount * (0.8 + i * 0.4) + i * 180) % CANVAS_H;
+    push();
+    stroke(255, 255, 255, map(i, 0, 2, 35, 10));
+    strokeWeight(1);
+    line(0, scanY, CANVAS_W, scanY);
+    pop();
+  }
+
+  // ── Data overlay: sample a vertical strip of probe values ──
+  // Show RGB values at the current scan position (moves with time)
+  const scanCol = floor((sin(t * 0.4) * 0.5 + 0.5) * floor(CANVAS_W / CELL));
+  const scanPx  = scanCol * CELL + CELL / 2;
+
+  // Dashed vertical line
+  push();
+  stroke(255, 255, 255, 40);
+  strokeWeight(1);
+  drawingContext.setLineDash([3, 7]);
+  line(scanPx, imgOffY, scanPx, imgOffY + drawH);
+  drawingContext.setLineDash([]);
+  pop();
+
+  const NUM_H = floor(CANVAS_H / CELL);
+  for (let row = 0; row < NUM_H; row++) {
+    if (!probeGrid[row] || !probeGrid[row][scanCol]) continue;
+    const [r, g, b] = probeGrid[row][scanCol];
+    const cy = row * CELL + CELL / 2;
+    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+
+    // Dashed guide line
+    push();
+    stroke(r, g, b, 50);
+    strokeWeight(0.5);
+    drawingContext.setLineDash([2, 8]);
+    line(scanPx, cy, CANVAS_W - 10, cy);
+    drawingContext.setLineDash([]);
+    pop();
+
+    // Circle at sample point
+    push();
+    noFill();
+    stroke(r, g, b, 140);
+    strokeWeight(0.8);
+    circle(scanPx, cy, 7);
+    pop();
+
+    // Value readout
+    push();
+    textFont('Courier New');
+    textSize(7.5);
+    textAlign(LEFT, CENTER);
+    noStroke();
+    fill(r, g, b, 160);
+    text(floor(lum / 16).toString(16).padStart(2, '0'), CANVAS_W - 22, cy);
+    pop();
+  }
+
+  // ── Vignette ──
+  push();
+  noStroke();
+  const grad = drawingContext.createRadialGradient(
+    CANVAS_W/2, CANVAS_H/2, CANVAS_H * 0.2,
+    CANVAS_W/2, CANVAS_H/2, CANVAS_H * 0.85
+  );
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.55)');
+  drawingContext.fillStyle = grad;
+  drawingContext.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  pop();
+}
+</script>
+</body>
+</html>

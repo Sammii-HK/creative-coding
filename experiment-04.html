@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Edge Glow — 04</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE  = 'DSCF7641.JPG';
+const CANVAS_W  = 900;
+const CANVAS_H  = 540;
+const CELL      = 6;
+const THRESHOLD = 28;   // edge detection sensitivity — lower = more edges
+const SCAN_SPEED = 1.4;
+
+let img;
+let COLS, ROWS;
+let cells = [];   // { cx, cy, r, g, b, lum, edge, activated, activateFrame }
+let scanX = 0;
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+  img.loadPixels();
+  COLS = floor(CANVAS_W / CELL);
+  ROWS = floor(CANVAS_H / CELL);
+  buildCells();
+}
+
+function lum(r, g, b) { return r * 0.299 + g * 0.587 + b * 0.114; }
+
+function sampleCell(col, row, scale, drawW, drawH, offX, offY) {
+  const cx = col * CELL + CELL / 2;
+  const cy = row * CELL + CELL / 2;
+  const ix = constrain(floor((cx - offX) / drawW * img.width),  0, img.width  - 1);
+  const iy = constrain(floor((cy - offY) / drawH * img.height), 0, img.height - 1);
+  const i  = (iy * img.width + ix) * 4;
+  return [img.pixels[i], img.pixels[i+1], img.pixels[i+2]];
+}
+
+function buildCells() {
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  const drawW = img.width * scale, drawH = img.height * scale;
+  const offX  = (CANVAS_W - drawW) / 2, offY = (CANVAS_H - drawH) / 2;
+
+  // Build luminance grid first
+  const lumGrid = [];
+  for (let row = 0; row < ROWS; row++) {
+    lumGrid[row] = [];
+    for (let col = 0; col < COLS; col++) {
+      const [r, g, b] = sampleCell(col, row, scale, drawW, drawH, offX, offY);
+      lumGrid[row][col] = lum(r, g, b);
+    }
+  }
+
+  // Sobel edge detection
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const cx = col * CELL + CELL / 2;
+      const cy = row * CELL + CELL / 2;
+      const [r, g, b] = sampleCell(col, row, scale, drawW, drawH, offX, offY);
+
+      let gx = 0, gy = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nr = constrain(row + dy, 0, ROWS - 1);
+          const nc = constrain(col + dx, 0, COLS - 1);
+          const l  = lumGrid[nr][nc];
+          // Sobel kernels
+          const kx = dx * (dy === 0 ? 2 : 1);
+          const ky = dy * (dx === 0 ? 2 : 1);
+          gx += l * kx;
+          gy += l * ky;
+        }
+      }
+
+      const edgeStr = sqrt(gx * gx + gy * gy);
+      cells.push({
+        cx, cy, r, g, b,
+        lum: lum(r, g, b),
+        edge: edgeStr,
+        isEdge: edgeStr > THRESHOLD,
+        activateFrame: -1,
+        // randomise settle duration
+        glowDuration: floor(random(20, 60)),
+      });
+    }
+  }
+}
+
+function draw() {
+  background(0);
+
+  // ── Advance scan ──
+  scanX += SCAN_SPEED;
+  if (scanX > CANVAS_W + CELL * 2) {
+    scanX = -CELL;
+    for (const c of cells) c.activateFrame = -1;
+  }
+
+  // ── Draw cells ──
+  noStroke();
+  for (const c of cells) {
+    const d = c.cx - scanX;
+
+    if (d < 0 && c.isEdge) {
+      // Activate on first pass
+      if (c.activateFrame === -1) c.activateFrame = frameCount;
+
+      const elapsed = frameCount - c.activateFrame;
+      let alpha, br;
+
+      if (elapsed < c.glowDuration) {
+        // Initial power-up flash
+        const t = elapsed / c.glowDuration;
+        alpha = map(t, 0, 1, 255, 180);
+        br    = map(t, 0, 1, 120, 0);
+      } else {
+        // Resting glow — subtle pulse
+        const pulse = sin(frameCount * 0.04 + c.cx * 0.01 + c.cy * 0.02);
+        alpha = map(pulse, -1, 1, 120, 220);
+        br    = 0;
+      }
+
+      // Stronger edges = brighter
+      const edgeMult = map(c.edge, THRESHOLD, 255, 0.6, 1.0);
+      fill(
+        min(c.r + br, 255),
+        min(c.g + br, 255),
+        min(c.b + br, 255),
+        alpha * edgeMult
+      );
+      rect(c.cx - CELL / 2, c.cy - CELL / 2, CELL, CELL);
+
+    } else if (d >= 0 && d < CELL * 5 && c.isEdge) {
+      // Cursor flash on edge cells
+      const flashA = map(d, 0, CELL * 5, 255, 0);
+      fill(min(c.r + 100, 255), min(c.g + 100, 255), min(c.b + 100, 255), flashA);
+      rect(c.cx - CELL / 2, c.cy - CELL / 2, CELL, CELL);
+
+    } else if (!c.isEdge && d < 0) {
+      // Non-edge cells: very faint ghost
+      fill(c.r, c.g, c.b, 8);
+      rect(c.cx - CELL / 2, c.cy - CELL / 2, CELL, CELL);
+    }
+  }
+
+  // ── Scan cursor ──
+  push();
+  for (let gw = 14; gw > 0; gw -= 2) {
+    stroke(255, 255, 255, map(gw, 14, 0, 0, 22));
+    strokeWeight(gw);
+    line(scanX, 0, scanX, CANVAS_H);
+  }
+  stroke(255, 255, 255, 100);
+  strokeWeight(1);
+  drawingContext.setLineDash([2, 5]);
+  line(scanX, 0, scanX, CANVAS_H);
+  drawingContext.setLineDash([]);
+  pop();
+}
+</script>
+</body>
+</html>

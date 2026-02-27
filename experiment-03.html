@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pixel Rain — 03</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE = 'DSCF7641.JPG';
+const CANVAS_W = 900;
+const CANVAS_H = 540;
+const CELL     = 11;
+
+let img;
+let COLS, ROWS;
+let grid  = [];  // grid[col][row] = { r, g, b, ch }
+let drops = [];
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+  textFont('Courier New');
+  img.loadPixels();
+
+  COLS = floor(CANVAS_W / CELL);
+  ROWS = floor(CANVAS_H / CELL);
+
+  buildGrid();
+  initDrops();
+}
+
+function buildGrid() {
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  const drawW = img.width * scale, drawH = img.height * scale;
+  const offX  = (CANVAS_W - drawW) / 2, offY = (CANVAS_H - drawH) / 2;
+
+  for (let col = 0; col < COLS; col++) {
+    grid[col] = [];
+    for (let row = 0; row < ROWS; row++) {
+      const cx = col * CELL + CELL / 2;
+      const cy = row * CELL + CELL / 2;
+      const ix = constrain(floor((cx - offX) / drawW * img.width),  0, img.width  - 1);
+      const iy = constrain(floor((cy - offY) / drawH * img.height), 0, img.height - 1);
+      const i  = (iy * img.width + ix) * 4;
+      const r  = img.pixels[i], g = img.pixels[i+1], b = img.pixels[i+2];
+      const lum = r * 0.299 + g * 0.587 + b * 0.114;
+      grid[col][row] = { r, g, b, ch: floor(lum / 16).toString(16) };
+    }
+  }
+}
+
+function makeDrop(col, startRow) {
+  return {
+    col,
+    head:   startRow,
+    speed:  random(0.25, 1.1),
+    length: floor(random(8, 28)),
+  };
+}
+
+function initDrops() {
+  for (let col = 0; col < COLS; col++) {
+    drops.push(makeDrop(col, -floor(random(ROWS))));
+    if (random() < 0.35) drops.push(makeDrop(col, -floor(random(ROWS * 2))));
+  }
+}
+
+function draw() {
+  // Semi-transparent black overlay → trail fade
+  noStroke();
+  fill(0, 0, 0, 55);
+  rect(0, 0, CANVAS_W, CANVAS_H);
+
+  textSize(CELL - 2);
+  textAlign(CENTER, CENTER);
+  noStroke();
+
+  for (const d of drops) {
+    d.head += d.speed;
+
+    for (let i = 0; i < d.length; i++) {
+      const row = floor(d.head) - i;
+      if (row < 0 || row >= ROWS) continue;
+
+      const cell = grid[d.col][row];
+      const cx   = d.col * CELL + CELL / 2;
+      const cy   = row   * CELL + CELL / 2;
+
+      if (i === 0) {
+        // Leading char — bright white flash, random scramble
+        fill(210, 255, 215, 255);
+        text(random() < 0.25 ? floor(random(16)).toString(16) : cell.ch, cx, cy);
+      } else {
+        // Trail — image colour, fading out
+        const a = map(i, 0, d.length, 210, 8);
+        const boost = map(i, 0, 3, 60, 0);
+        fill(
+          min(cell.r + boost, 255),
+          min(cell.g + boost, 255),
+          min(cell.b + boost, 255),
+          a
+        );
+        text(cell.ch, cx, cy);
+      }
+    }
+
+    // Respawn off bottom
+    if (d.head - d.length > ROWS) {
+      d.head   = -floor(random(ROWS * 0.6));
+      d.speed  = random(0.25, 1.1);
+      d.length = floor(random(8, 28));
+    }
+  }
+}
+</script>
+</body>
+</html>

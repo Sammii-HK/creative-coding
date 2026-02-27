@@ -17,46 +17,23 @@
       gap: 48px;
       padding: 60px 40px;
     }
-    h1 {
-      font-size: 11px;
-      letter-spacing: 0.25em;
-      text-transform: uppercase;
-      color: #444;
-    }
-    .experiments {
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-      width: 100%;
-      max-width: 640px;
-    }
+    h1 { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: #333; }
+    .experiments { display: flex; flex-direction: column; gap: 2px; width: 100%; max-width: 640px; }
     a.card {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
       align-items: baseline;
+      gap: 20px;
       text-decoration: none;
       color: inherit;
-      border: 1px solid #1a1a1a;
-      padding: 20px 24px;
-      transition: border-color 0.2s;
+      border: 1px solid #0e0e0e;
+      padding: 16px 20px;
+      transition: border-color 0.15s, background 0.15s;
     }
-    a.card:hover { border-color: #444; }
-    .card-num {
-      font-size: 10px;
-      color: #333;
-      letter-spacing: 0.15em;
-    }
-    .card-title {
-      font-size: 13px;
-      color: #888;
-      letter-spacing: 0.1em;
-    }
-    .card-desc {
-      font-size: 10px;
-      color: #333;
-      text-align: right;
-      max-width: 200px;
-    }
+    a.card:hover { border-color: #333; background: #080808; }
+    .card-num   { font-size: 10px; color: #2a2a2a; letter-spacing: 0.1em; }
+    .card-title { font-size: 12px; color: #777; letter-spacing: 0.08em; }
+    .card-desc  { font-size: 9px; color: #2a2a2a; text-align: right; }
   </style>
 </head>
 <body>
@@ -65,12 +42,37 @@
     <a class="card" href="experiment-01.html">
       <span class="card-num">01</span>
       <span class="card-title">Pixel Scanner</span>
-      <span class="card-desc">RGB scan cursor with orbital analysis</span>
+      <span class="card-desc">RGB scan cursor + orbital analysis</span>
     </a>
     <a class="card" href="experiment-02.html">
       <span class="card-num">02</span>
       <span class="card-title">Codified Image</span>
-      <span class="card-desc">Image rendered as its own pixel data</span>
+      <span class="card-desc">Hex grid reveal with async scramble</span>
+    </a>
+    <a class="card" href="experiment-03.html">
+      <span class="card-num">03</span>
+      <span class="card-title">Pixel Rain</span>
+      <span class="card-desc">Matrix columns coloured by image</span>
+    </a>
+    <a class="card" href="experiment-04.html">
+      <span class="card-num">04</span>
+      <span class="card-title">Edge Glow</span>
+      <span class="card-desc">Sobel edges powered up by scan cursor</span>
+    </a>
+    <a class="card" href="experiment-05.html">
+      <span class="card-num">05</span>
+      <span class="card-title">Voronoi Drift</span>
+      <span class="card-desc">Drifting seeds partition the image</span>
+    </a>
+    <a class="card" href="experiment-06.html">
+      <span class="card-num">06</span>
+      <span class="card-title">Particle Burst</span>
+      <span class="card-desc">5000 particles spring back to their home pixels — click to scatter</span>
+    </a>
+    <a class="card" href="experiment-07.html">
+      <span class="card-num">07</span>
+      <span class="card-title">Waveform</span>
+      <span class="card-desc">Sine wave distortion + scan data overlay</span>
     </a>
   </div>
 </body>

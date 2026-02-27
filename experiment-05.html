@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Voronoi Drift — 05</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE  = 'DSCF7641.JPG';
+const CANVAS_W  = 900;
+const CANVAS_H  = 540;
+const CELL      = 14;   // grid resolution
+const NUM_SEEDS = 28;   // voronoi sites
+
+let img;
+let COLS, ROWS;
+let imgColors = [];   // imgColors[col][row] = [r, g, b] — image sampled at grid
+let seeds = [];       // { x, y, vx, vy }
+let prevOwner = [];   // previous nearest-seed index per cell, for transition
+
+// Smooth colour transition per cell
+let cellColors = [];  // current displayed [r, g, b] (lerped)
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+  img.loadPixels();
+
+  COLS = floor(CANVAS_W / CELL);
+  ROWS = floor(CANVAS_H / CELL);
+
+  buildImgColors();
+  initSeeds();
+  initCellColors();
+}
+
+function buildImgColors() {
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  const drawW = img.width * scale, drawH = img.height * scale;
+  const offX  = (CANVAS_W - drawW) / 2, offY = (CANVAS_H - drawH) / 2;
+
+  for (let col = 0; col < COLS; col++) {
+    imgColors[col] = [];
+    for (let row = 0; row < ROWS; row++) {
+      const cx = col * CELL + CELL / 2;
+      const cy = row * CELL + CELL / 2;
+      const ix = constrain(floor((cx - offX) / drawW * img.width),  0, img.width  - 1);
+      const iy = constrain(floor((cy - offY) / drawH * img.height), 0, img.height - 1);
+      const i  = (iy * img.width + ix) * 4;
+      imgColors[col][row] = [img.pixels[i], img.pixels[i+1], img.pixels[i+2]];
+    }
+  }
+}
+
+function initSeeds() {
+  for (let i = 0; i < NUM_SEEDS; i++) {
+    const angle = random(TWO_PI);
+    seeds.push({
+      x:  random(CANVAS_W),
+      y:  random(CANVAS_H),
+      vx: cos(angle) * random(0.3, 0.9),
+      vy: sin(angle) * random(0.3, 0.9),
+    });
+  }
+}
+
+function initCellColors() {
+  // Initialise each cell to its own image colour
+  for (let col = 0; col < COLS; col++) {
+    cellColors[col] = [];
+    prevOwner[col]  = [];
+    for (let row = 0; row < ROWS; row++) {
+      cellColors[col][row] = [...imgColors[col][row], 0]; // [r,g,b, lerp t]
+      prevOwner[col][row]  = -1;
+    }
+  }
+}
+
+function nearestSeed(cx, cy) {
+  let best = 0, bestDist = Infinity;
+  for (let i = 0; i < seeds.length; i++) {
+    const d = (cx - seeds[i].x) ** 2 + (cy - seeds[i].y) ** 2;
+    if (d < bestDist) { bestDist = d; best = i; }
+  }
+  return best;
+}
+
+function draw() {
+  background(0);
+
+  // Move seeds
+  for (const s of seeds) {
+    s.x += s.vx;
+    s.y += s.vy;
+    // Bounce off edges
+    if (s.x < 0 || s.x > CANVAS_W) s.vx *= -1;
+    if (s.y < 0 || s.y > CANVAS_H) s.vy *= -1;
+    s.x = constrain(s.x, 0, CANVAS_W);
+    s.y = constrain(s.y, 0, CANVAS_H);
+  }
+
+  noStroke();
+
+  for (let col = 0; col < COLS; col++) {
+    for (let row = 0; row < ROWS; row++) {
+      const cx = col * CELL + CELL / 2;
+      const cy = row * CELL + CELL / 2;
+
+      const owner = nearestSeed(cx, cy);
+
+      // Get the seed's colour = image colour at the seed's current position
+      const sx = constrain(floor(seeds[owner].x / CANVAS_W * COLS), 0, COLS - 1);
+      const sy = constrain(floor(seeds[owner].y / CANVAS_H * ROWS), 0, ROWS - 1);
+      const [tr, tg, tb] = imgColors[sx][sy];
+
+      // Smooth transition when owner changes
+      if (prevOwner[col][row] !== owner) {
+        prevOwner[col][row] = owner;
+        cellColors[col][row][3] = 0; // reset lerp
+      }
+
+      const t = cellColors[col][row][3];
+      const cr = lerp(cellColors[col][row][0], tr, 0.06);
+      const cg = lerp(cellColors[col][row][1], tg, 0.06);
+      const cb = lerp(cellColors[col][row][2], tb, 0.06);
+      cellColors[col][row][0] = cr;
+      cellColors[col][row][1] = cg;
+      cellColors[col][row][2] = cb;
+      cellColors[col][row][3] = min(t + 0.06, 1);
+
+      fill(cr, cg, cb, 230);
+      rect(col * CELL, row * CELL, CELL - 1, CELL - 1);
+    }
+  }
+
+  // Draw seed points subtly
+  for (const s of seeds) {
+    noFill();
+    stroke(255, 255, 255, 30);
+    strokeWeight(1);
+    circle(s.x, s.y, 4);
+  }
+}
+</script>
+</body>
+</html>
