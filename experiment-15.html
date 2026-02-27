@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Bubble Glass — 15</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; cursor: none; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; cursor: pointer; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE = 'DSCF7641.JPG';
+const CANVAS_W = 900;
+const CANVAS_H = 540;
+const R        = 150;   // lens radius
+const MAG      = 1.38;  // magnification inside lens
+
+let img;
+let offX, offY, drawW, drawH;
+let lx, ly;  // smooth lens position
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  drawW = img.width  * scale;
+  drawH = img.height * scale;
+  offX  = (CANVAS_W - drawW) / 2;
+  offY  = (CANVAS_H - drawH) / 2;
+
+  lx = CANVAS_W / 2;
+  ly = CANVAS_H / 2;
+}
+
+function draw() {
+  background(0);
+
+  // Smooth lens follows mouse
+  lx = lerp(lx, mouseX, 0.05);
+  ly = lerp(ly, mouseY, 0.05);
+
+  const dc = drawingContext;
+
+  // ── Background: image dimmed ──
+  push();
+  tint(55);
+  image(img, offX, offY, drawW, drawH);
+  noTint();
+  pop();
+
+  // ── 1. Magnified image inside lens ──
+  dc.save();
+  dc.beginPath();
+  dc.arc(lx, ly, R, 0, Math.PI * 2);
+  dc.clip();
+  // Scale from lens centre to magnify
+  dc.translate(lx, ly);
+  dc.scale(MAG, MAG);
+  dc.translate(-lx, -ly);
+  dc.drawImage(img.canvas ?? img.elt, offX, offY, drawW, drawH);
+  dc.restore();
+
+  // ── 2. Inner glass curvature shadow ──
+  // Darker near the edge from inside — gives the lens its curved body
+  const innerShadow = dc.createRadialGradient(lx, ly, R * 0.52, lx, ly, R);
+  innerShadow.addColorStop(0,   'rgba(0,0,0,0)');
+  innerShadow.addColorStop(0.7, 'rgba(0,0,0,0)');
+  innerShadow.addColorStop(1,   'rgba(0,0,0,0.55)');
+  dc.save();
+  dc.beginPath();
+  dc.arc(lx, ly, R, 0, Math.PI * 2);
+  dc.fillStyle = innerShadow;
+  dc.fill();
+  dc.restore();
+
+  // ── 3. Iridescent soap-bubble rim ──
+  drawBubbleRim(dc, lx, ly, R);
+
+  // ── 4. Cursor crosshair (tiny) ──
+  push();
+  stroke(255, 255, 255, 35);
+  strokeWeight(0.5);
+  line(lx - 7, ly, lx + 7, ly);
+  line(lx, ly - 7, lx, ly + 7);
+  pop();
+
+  // ── Label ──
+  push();
+  textFont('Courier New');
+  textSize(8);
+  textAlign(LEFT, BOTTOM);
+  noStroke();
+  fill(255, 255, 255, 18);
+  text('bubble glass — move mouse', 12, CANVAS_H - 10);
+  pop();
+}
+
+function drawBubbleRim(dc, cx, cy, r) {
+  const t = frameCount * 0.4;  // colour-shift speed
+
+  // ── Layer A: wide iridescent band ──
+  // Painted as many short arc segments, each a different slowly-shifting hue.
+  // Two passes with different hue offsets create the layered soap-film look.
+  const SEGS  = 200;
+  const RIM_W = 18;
+
+  for (let pass = 0; pass < 2; pass++) {
+    const hueOffset = pass === 0 ? 0 : 140;
+    const radiusOff = pass === 0 ? 0 : -RIM_W * 0.35;
+    const alphaBase = pass === 0 ? 0.55 : 0.28;
+
+    for (let i = 0; i < SEGS; i++) {
+      const a0  = (i       / SEGS) * Math.PI * 2;
+      const a1  = ((i + 1) / SEGS) * Math.PI * 2 + 0.03;  // slight overlap
+      // Hue cycles around the rim + drifts over time
+      const hue = (i / SEGS * 360 + t + hueOffset) % 360;
+      // Saturation pulses gently
+      const sat = 75 + 20 * Math.sin(i / SEGS * Math.PI * 6 + t * 0.3);
+
+      dc.beginPath();
+      dc.arc(cx, cy, r + radiusOff, a0, a1);
+      dc.strokeStyle = `hsla(${hue}, ${sat}%, 72%, ${alphaBase})`;
+      dc.lineWidth = RIM_W;
+      dc.stroke();
+    }
+  }
+
+  // ── Layer B: thin bright inner rim ──
+  dc.beginPath();
+  dc.arc(cx, cy, r - RIM_W * 0.5, 0, Math.PI * 2);
+  dc.strokeStyle = 'rgba(255,255,255,0.12)';
+  dc.lineWidth = 2.5;
+  dc.stroke();
+
+  // ── Layer C: thin outer rim ──
+  dc.beginPath();
+  dc.arc(cx, cy, r + RIM_W * 0.45, 0, Math.PI * 2);
+  dc.strokeStyle = 'rgba(255,255,255,0.08)';
+  dc.lineWidth = 2;
+  dc.stroke();
+
+  // ── Layer D: specular highlight — bright crescent top-left ──
+  // Mimics a light source hitting the curved glass surface.
+  dc.save();
+  dc.beginPath();
+  dc.arc(cx, cy, r - 3, -2.5, -0.65);
+  dc.strokeStyle = 'rgba(255,255,255,0.75)';
+  dc.lineWidth = 3.5;
+  dc.lineCap = 'round';
+  dc.stroke();
+  // Softer outer glow of the same arc
+  dc.beginPath();
+  dc.arc(cx, cy, r + 2, -2.5, -0.65);
+  dc.strokeStyle = 'rgba(255,255,255,0.15)';
+  dc.lineWidth = 8;
+  dc.stroke();
+  dc.restore();
+
+  // ── Layer E: small secondary specular bottom-right ──
+  dc.save();
+  dc.beginPath();
+  dc.arc(cx, cy, r - 4, 0.9, 1.7);
+  dc.strokeStyle = 'rgba(255,255,255,0.22)';
+  dc.lineWidth = 2.5;
+  dc.lineCap = 'round';
+  dc.stroke();
+  dc.restore();
+
+  // ── Layer F: chromatic fringe just inside the rim ──
+  // Red bleeds slightly outward, blue inward — like a real lens edge.
+  dc.save();
+  dc.beginPath();
+  dc.arc(cx, cy, r - RIM_W - 1, 0, Math.PI * 2);
+  dc.strokeStyle = 'rgba(100,180,255,0.18)';
+  dc.lineWidth = 4;
+  dc.stroke();
+  dc.beginPath();
+  dc.arc(cx, cy, r + RIM_W * 0.55 + 2, 0, Math.PI * 2);
+  dc.strokeStyle = 'rgba(255,100,80,0.14)';
+  dc.lineWidth = 4;
+  dc.stroke();
+  dc.restore();
+}
+</script>
+</body>
+</html>
