@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Particle Field — 08</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; gap: 16px; cursor: none; }
+    canvas { display: block; }
+    #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; cursor: pointer; }
+    #back:hover { color: #555; }
+  </style>
+</head>
+<body>
+<a id="back" href="index.html">← back</a>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script>
+const IMG_FILE      = 'DSCF7641.JPG';
+const CANVAS_W      = 900;
+const CANVAS_H      = 540;
+const NUM_PARTICLES = 5500;
+const SPRING_K      = 0.032;
+const DAMPING       = 0.87;
+const REPEL_RADIUS  = 95;
+const REPEL_FORCE   = 7.5;
+const ATTRACT_FORCE = 5.0;
+
+let img;
+let particles = [];
+let attractMode = false;    // toggle with click
+let modeFlash   = 0;        // frame of last mode toggle for UI flash
+
+function preload() { img = loadImage(IMG_FILE); }
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(CANVAS_W, CANVAS_H);
+  img.loadPixels();
+  buildParticles();
+}
+
+function buildParticles() {
+  const scale = Math.min(CANVAS_W / img.width, CANVAS_H / img.height);
+  const drawW = img.width * scale, drawH = img.height * scale;
+  const offX  = (CANVAS_W - drawW) / 2, offY = (CANVAS_H - drawH) / 2;
+
+  const gridCols = ceil(sqrt(NUM_PARTICLES * (CANVAS_W / CANVAS_H)));
+  const gridRows = ceil(NUM_PARTICLES / gridCols);
+
+  for (let gr = 0; gr < gridRows; gr++) {
+    for (let gc = 0; gc < gridCols; gc++) {
+      if (particles.length >= NUM_PARTICLES) break;
+
+      const hx = (gc + 0.5) / gridCols * CANVAS_W;
+      const hy = (gr + 0.5) / gridRows * CANVAS_H;
+
+      const ix = constrain(floor((hx - offX) / drawW * img.width),  0, img.width  - 1);
+      const iy = constrain(floor((hy - offY) / drawH * img.height), 0, img.height - 1);
+      const i  = (iy * img.width + ix) * 4;
+      const r  = img.pixels[i], g = img.pixels[i+1], b = img.pixels[i+2];
+      const lum = r * 0.299 + g * 0.587 + b * 0.114;
+
+      if (lum < 10) continue;
+
+      particles.push({
+        hx, hy, x: hx, y: hy,
+        vx: 0, vy: 0,
+        r, g, b, lum,
+        size: map(lum, 0, 255, 0.7, 2.4),
+      });
+    }
+  }
+}
+
+function mousePressed() {
+  attractMode = !attractMode;
+  modeFlash   = frameCount;
+}
+
+function draw() {
+  // Fade trail — slightly faster than 06 for crispness
+  noStroke();
+  fill(0, 0, 0, 45);
+  rect(0, 0, CANVAS_W, CANVAS_H);
+
+  const mx = mouseX, my = mouseY;
+  const mouseOnCanvas = mx >= 0 && mx <= CANVAS_W && my >= 0 && my <= CANVAS_H;
+
+  // ── Update + draw particles ──
+  noStroke();
+  for (const p of particles) {
+    // Spring toward home
+    p.vx += (p.hx - p.x) * SPRING_K;
+    p.vy += (p.hy - p.y) * SPRING_K;
+
+    // Mouse influence
+    if (mouseOnCanvas) {
+      const dx = p.x - mx;
+      const dy = p.y - my;
+      const d2 = dx * dx + dy * dy;
+      const d  = sqrt(d2);
+
+      if (d < REPEL_RADIUS && d > 0.5) {
+        const falloff = (REPEL_RADIUS - d) / REPEL_RADIUS; // linear: max at cursor, 0 at edge
+
+        if (!attractMode) {
+          // ── Repel: push straight away ──
+          const f = falloff * REPEL_FORCE;
+          p.vx += (dx / d) * f;
+          p.vy += (dy / d) * f;
+        } else {
+          // ── Attract: pull in + add tangential spin (vortex) ──
+          const f = falloff * ATTRACT_FORCE;
+          p.vx -= (dx / d) * f;
+          p.vy -= (dy / d) * f;
+          // Tangential component — creates spiral
+          p.vx += (-dy / d) * falloff * 2.2;
+          p.vy += ( dx / d) * falloff * 2.2;
+        }
+      }
+    }
+
+    // Damping
+    p.vx *= DAMPING;
+    p.vy *= DAMPING;
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // Visual
+    const speed = sqrt(p.vx * p.vx + p.vy * p.vy);
+    const boost = map(speed, 0, 10, 0, 100);
+    const alpha = map(speed, 0, 3, 170, 255);
+
+    fill(
+      min(p.r + boost, 255),
+      min(p.g + boost, 255),
+      min(p.b + boost, 255),
+      alpha
+    );
+    const sz = p.size + map(speed, 0, 10, 0, 1.8);
+    circle(p.x, p.y, sz);
+  }
+
+  // ── Cursor ring ──
+  if (mouseOnCanvas) {
+    push();
+    noFill();
+    // Outer ring — mode colour
+    const ringR = attractMode ? 180 : 255;
+    const ringG = attractMode ? 120 : 255;
+    const ringB = attractMode ? 255 : 255;
+
+    // Pulsing ring radius
+    const pulse = sin(frameCount * 0.08) * 4;
+
+    stroke(ringR, ringG, ringB, 35);
+    strokeWeight(1);
+    drawingContext.setLineDash([3, 6]);
+    circle(mx, my, (REPEL_RADIUS + pulse) * 2);
+    drawingContext.setLineDash([]);
+
+    // Inner dot (custom cursor)
+    fill(ringR, ringG, ringB, 180);
+    noStroke();
+    circle(mx, my, 3);
+
+    // Mode label
+    textFont('Courier New');
+    textSize(7.5);
+    textAlign(LEFT, CENTER);
+    fill(ringR, ringG, ringB, map(frameCount - modeFlash, 0, 40, 220, 80));
+    text(attractMode ? 'attract' : 'repel', mx + 10, my - 10);
+    pop();
+  }
+}
+</script>
+</body>
+</html>
