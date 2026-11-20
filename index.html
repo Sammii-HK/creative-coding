@@ -1,120 +1,20 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Creative Coding</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #000;
-      color: #fff;
-      font-family: 'Courier New', monospace;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 48px;
-      padding: 60px 40px;
-    }
-    h1 { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: #333; }
-    .experiments { display: flex; flex-direction: column; gap: 2px; width: 100%; max-width: 640px; }
-    a.card {
-      display: grid;
-      grid-template-columns: 36px 1fr auto;
-      align-items: baseline;
-      gap: 20px;
-      text-decoration: none;
-      color: inherit;
-      border: 1px solid #0e0e0e;
-      padding: 16px 20px;
-      transition: border-color 0.15s, background 0.15s;
-    }
-    a.card:hover { border-color: #333; background: #080808; }
-    .card-num   { font-size: 10px; color: #2a2a2a; letter-spacing: 0.1em; }
-    .card-title { font-size: 12px; color: #777; letter-spacing: 0.08em; }
-    .card-desc  { font-size: 9px; color: #2a2a2a; text-align: right; }
-  </style>
-</head>
-<body>
-  <h1>Creative Coding / Sammii</h1>
-  <div class="experiments">
-    <a class="card" href="experiment-01.html">
-      <span class="card-num">01</span>
-      <span class="card-title">Pixel Scanner</span>
-      <span class="card-desc">RGB scan cursor + orbital analysis</span>
-    </a>
-    <a class="card" href="experiment-02.html">
-      <span class="card-num">02</span>
-      <span class="card-title">Codified Image</span>
-      <span class="card-desc">Hex grid reveal with async scramble</span>
-    </a>
-    <a class="card" href="experiment-03.html">
-      <span class="card-num">03</span>
-      <span class="card-title">Pixel Rain</span>
-      <span class="card-desc">Matrix columns coloured by image</span>
-    </a>
-    <a class="card" href="experiment-04.html">
-      <span class="card-num">04</span>
-      <span class="card-title">Edge Glow</span>
-      <span class="card-desc">Sobel edges powered up by scan cursor</span>
-    </a>
-    <a class="card" href="experiment-05.html">
-      <span class="card-num">05</span>
-      <span class="card-title">Voronoi Drift</span>
-      <span class="card-desc">Drifting seeds partition the image</span>
-    </a>
-    <a class="card" href="experiment-06.html">
-      <span class="card-num">06</span>
-      <span class="card-title">Particle Burst</span>
-      <span class="card-desc">5000 particles spring back to their home pixels, click to scatter</span>
-    </a>
-    <a class="card" href="experiment-07.html">
-      <span class="card-num">07</span>
-      <span class="card-title">Waveform</span>
-      <span class="card-desc">Sine wave distortion + scan data overlay</span>
-    </a>
-    <a class="card" href="experiment-08.html">
-      <span class="card-num">08</span>
-      <span class="card-title">Particle Field</span>
-      <span class="card-desc">Hover to repel, click to switch attract/vortex</span>
-    </a>
-    <a class="card" href="experiment-09.html">
-      <span class="card-num">09</span>
-      <span class="card-title">Pixel Sort</span>
-      <span class="card-desc">Column sort by luminance, channel, saturation</span>
-    </a>
-    <a class="card" href="experiment-10.html">
-      <span class="card-num">10</span>
-      <span class="card-title">Flow Field</span>
-      <span class="card-desc">Perlin noise flow, mouse tilts the field</span>
-    </a>
-    <a class="card" href="experiment-11.html">
-      <span class="card-num">11</span>
-      <span class="card-title">Kaleidoscope</span>
-      <span class="card-desc">Radial mirror, move mouse, click to change segments</span>
-    </a>
-    <a class="card" href="experiment-12.html">
-      <span class="card-num">12</span>
-      <span class="card-title">Crystal Growth</span>
-      <span class="card-desc">BFS flood fill from 32 seeds partitions the image</span>
-    </a>
-    <a class="card" href="experiment-13.html">
-      <span class="card-num">13</span>
-      <span class="card-title">Chromatic Glitch</span>
-      <span class="card-desc">RGB channel aberration, slice tears, scanline flicker</span>
-    </a>
-    <a class="card" href="experiment-14.html">
-      <span class="card-num">14</span>
-      <span class="card-title">Bokeh Field</span>
-      <span class="card-desc">Hover to bloom, discs grow and brighten under the cursor</span>
-    </a>
-    <a class="card" href="experiment-15.html">
-      <span class="card-num">15</span>
-      <span class="card-title">Bubble Glass</span>
-      <span class="card-desc">Magnifying lens with iridescent soap-bubble rim</span>
-    </a>
-
-  </div>
-</body>
-</html>
+<!doctype html>
+<html lang="en-GB"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Creative coding studies by Sammii</title><meta name="description" content="Fifteen photographic studies in pixels, motion and geometry. Explore each sketch at your own pace."><link rel="stylesheet" href="gallery.css"><link rel="icon" href="icon.svg" type="image/svg+xml"><script src="study-icons.js" defer></script><script src="gallery.js" defer></script></head><body>
+<a class="skip-link" href="#main">Skip to studies</a><header class="gallery-header"><a class="text-link" href="index.html"><span class="ui-icon" data-lucide="grid"></span>Creative coding</a><a class="text-link" href="https://sammii.dev">Sammii’s lab<span class="ui-icon" data-lucide="arrow-up-right"></span></a></header>
+<main class="gallery-main" id="main"><section class="gallery-hero"><div><p class="eyebrow">A sketchbook in fifteen parts</p><h1>Fifteen ways<br>to look again.</h1></div><p class="gallery-intro">One photograph, reworked in pixels, motion and geometry. Open a study, slow it down, and follow what changes. Every canvas starts paused.</p></section>
+<section aria-label="Find a study"><div class="gallery-tools"><label class="search-field"><span class="ui-icon" data-lucide="search"></span><span class="visually-hidden">Search studies</span><input id="study-search" type="search" placeholder="Find a technique or study…" autocomplete="off"></label><div class="category-controls" role="group" aria-label="Study category"><button type="button" data-category="All" aria-pressed="true">All</button><button type="button" data-category="Pixels" aria-pressed="false">Pixels</button><button type="button" data-category="Particles" aria-pressed="false">Particles</button><button type="button" data-category="Geometry" aria-pressed="false">Geometry</button></div></div><p class="gallery-count" role="status" id="study-count">15 studies to explore</p><div class="studies-grid"><a class="study-card" href="experiment-01.html" data-category="Pixels" data-search="pixel scanner rgb scan cursor + orbital analysis pixels"><div class="card-top"><span class="card-number">01</span><span>Pixels</span></div><h2>Pixel Scanner</h2><p>RGB scan cursor + orbital analysis</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-02.html" data-category="Pixels" data-search="codified image hex grid reveal with async scramble pixels"><div class="card-top"><span class="card-number">02</span><span>Pixels</span></div><h2>Codified Image</h2><p>Hex grid reveal with async scramble</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-03.html" data-category="Pixels" data-search="pixel rain matrix columns coloured by image pixels"><div class="card-top"><span class="card-number">03</span><span>Pixels</span></div><h2>Pixel Rain</h2><p>Matrix columns coloured by image</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-04.html" data-category="Pixels" data-search="edge glow sobel edges powered up by scan cursor pixels"><div class="card-top"><span class="card-number">04</span><span>Pixels</span></div><h2>Edge Glow</h2><p>Sobel edges powered up by scan cursor</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-05.html" data-category="Geometry" data-search="voronoi drift drifting seeds partition the image geometry"><div class="card-top"><span class="card-number">05</span><span>Geometry</span></div><h2>Voronoi Drift</h2><p>Drifting seeds partition the image</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-06.html" data-category="Particles" data-search="particle burst 5000 particles spring back to their home pixels, click to scatter particles"><div class="card-top"><span class="card-number">06</span><span>Particles</span></div><h2>Particle Burst</h2><p>5000 particles spring back to their home pixels, click to scatter</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-07.html" data-category="Pixels" data-search="waveform sine wave distortion + scan data overlay pixels"><div class="card-top"><span class="card-number">07</span><span>Pixels</span></div><h2>Waveform</h2><p>Sine wave distortion + scan data overlay</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-08.html" data-category="Particles" data-search="particle field hover to repel, click to switch attract/vortex particles"><div class="card-top"><span class="card-number">08</span><span>Particles</span></div><h2>Particle Field</h2><p>Hover to repel, click to switch attract/vortex</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-09.html" data-category="Pixels" data-search="pixel sort column sort by luminance, channel, saturation pixels"><div class="card-top"><span class="card-number">09</span><span>Pixels</span></div><h2>Pixel Sort</h2><p>Column sort by luminance, channel, saturation</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-10.html" data-category="Particles" data-search="flow field perlin noise flow, mouse tilts the field particles"><div class="card-top"><span class="card-number">10</span><span>Particles</span></div><h2>Flow Field</h2><p>Perlin noise flow, mouse tilts the field</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-11.html" data-category="Geometry" data-search="kaleidoscope radial mirror, move mouse, click to change segments geometry"><div class="card-top"><span class="card-number">11</span><span>Geometry</span></div><h2>Kaleidoscope</h2><p>Radial mirror, move mouse, click to change segments</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-12.html" data-category="Geometry" data-search="crystal growth bfs flood fill from 32 seeds partitions the image geometry"><div class="card-top"><span class="card-number">12</span><span>Geometry</span></div><h2>Crystal Growth</h2><p>BFS flood fill from 32 seeds partitions the image</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-13.html" data-category="Pixels" data-search="chromatic glitch rgb channel aberration, slice tears, scanline flicker pixels"><div class="card-top"><span class="card-number">13</span><span>Pixels</span></div><h2>Chromatic Glitch</h2><p>RGB channel aberration, slice tears, scanline flicker</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-14.html" data-category="Particles" data-search="bokeh field hover to bloom, discs grow and brighten under the cursor particles"><div class="card-top"><span class="card-number">14</span><span>Particles</span></div><h2>Bokeh Field</h2><p>Hover to bloom, discs grow and brighten under the cursor</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a>
+<a class="study-card" href="experiment-15.html" data-category="Geometry" data-search="bubble glass magnifying lens with iridescent soap-bubble rim geometry"><div class="card-top"><span class="card-number">15</span><span>Geometry</span></div><h2>Bubble Glass</h2><p>Magnifying lens with iridescent soap-bubble rim</p><div class="card-bottom"><span>Open the study</span><span class="ui-icon" data-lucide="arrow-up-right"></span></div></a></div><p class="gallery-empty" id="empty-state" hidden>No studies match. Try another technique, or <button type="button" id="clear-search">clear the filters</button>.</p></section>
+<footer class="gallery-footer"><p>One photograph, explored through fifteen visual studies.</p><a class="text-link" href="https://labs.sammii.dev">Explore the wider lab<span class="ui-icon" data-lucide="arrow-up-right"></span></a></footer></main></body></html>

@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en-GB">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Flow Field — 10</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -10,10 +11,14 @@
     #back { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.2em; color: #222; text-decoration: none; text-transform: uppercase; transition: color 0.2s; cursor: pointer; }
     #back:hover { color: #555; }
   </style>
+  <link rel="stylesheet" href="gallery.css">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <script src="study-data.js" defer></script>
+  <script src="study-icons.js" defer></script>
+  <script src="study-shell.js" defer></script>
 </head>
 <body>
-<a id="back" href="index.html">← back</a>
-<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<script src="vendor/p5.min.js"></script>
 <script>
 const IMG_FILE      = 'DSCF7641.JPG';
 const CANVAS_W      = 900;
