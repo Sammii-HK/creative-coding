@@ -2,7 +2,7 @@
 
 A series of visual experiments built with [p5.js](https://p5js.org), each one treating a single photograph as raw material.
 
-The visitor-facing gallery is static HTML, CSS and JavaScript. Its fifteen studies share navigation, responsive canvases, Lucide controls, search and categories. Motion starts paused; play it, inspect one frame, or focus the canvas to use the keyboard. The p5 runtime is self-hosted, so the sketches no longer depend on a CDN.
+The gallery is static HTML, CSS and JavaScript. All fifteen studies share navigation, responsive canvases, search and categories. Each one starts paused: play it, step through a frame at a time, or focus the canvas to use the keyboard.
 
 ---
 
@@ -36,7 +36,7 @@ Every experiment uses the same source image: a cream begonia shot on a Fujifilm 
 
 ## Running locally
 
-Use Node 24 for development checks. The checked-in runtime and gallery can also be served directly without Node.
+The site runs as plain static files. Node 24 is only needed for the build, tests and checks.
 
 ```sh
 npm ci --ignore-scripts
@@ -47,19 +47,15 @@ npm start
 # http://127.0.0.1:4824
 ```
 
-`studies.json` is the gallery metadata source. `npm run build` refreshes the gallery and browser data. Use `npm run vendor:p5` or `npm run vendor:icons` after intentionally changing those locked dependencies. Normal lint verifies generated assets, JavaScript syntax and the original sketch source hashes.
+`studies.json` is the gallery metadata source; `npm run build` regenerates the gallery and study data from it. Run `npm run vendor:p5` or `npm run vendor:icons` after updating those dependencies. `npm run lint` checks the generated files and that each sketch's code is unchanged.
 
-Arrow keys move the study pointer; Space plays or pauses; Enter invokes the existing pointer action where provided. Clicking navigation or toolbar controls does not trigger the sketch's click action. Paused pointer actions redraw immediately. Leaving the page records a paused state rather than silently resuming motion.
+On a study page, arrow keys move the pointer, Space plays or pauses, and Enter triggers the sketch's click action where it has one.
 
 ---
 
 ## Stack
 
-- [p5.js](https://p5js.org) 1.11.13, self-hosted with its licence
-- Vanilla HTML/CSS/JavaScript, no runtime framework or bundler
-- Lucide 1.67.0 controls and favicon, generated from the official components
-- Node tests and JSDOM for the gallery, resource controls and actual p5 binding regression
-
-All fifteen original inline sketch algorithms remain byte-identical to the recorded baseline. A shared binding repair restores Pixel Scanner's own saturation helper after p5's global binder replaces it; this corrects the intended colour ranking without rewriting that source. The p5 patch update and binding correction mean identical source hashes are not a claim of pixel-identical historical rendering.
-
-See `docs/quality/product-review-20261120.md` for the desktop/phone evidence and limits. This batch is local and unreleased.
+- [p5.js](https://p5js.org) 1.11, self-hosted with its licence
+- Vanilla HTML, CSS and JavaScript, no runtime framework or bundler
+- [Lucide](https://lucide.dev) icons for controls and the favicon
+- Node's test runner and JSDOM for the gallery and study controls
