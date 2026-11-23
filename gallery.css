@@ -1,10 +1,27 @@
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
   --paper: #f5f3ed;
+  --paper-raised: #ece9e0;
   --ink: #292925;
   --muted: #64645b;
   --line: #d9d7cd;
+  --control-line: #d9d7cd;
   --accent: #7c462a;
+  --stage: #080808;
+  --stage-edge: transparent;
+  --stage-focus: #e5bea0;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0d0d0c;
+    --paper-raised: #161614;
+    --ink: #ecebe3;
+    --muted: #a3a298;
+    --line: #262522;
+    --control-line: #67655d;
+    --accent: #e2b897;
+    --stage-edge: #1f1e1b;
+  }
 }
 * {
   box-sizing: border-box;
@@ -183,7 +200,7 @@ h1 {
   gap: 1.2rem;
 }
 .study-card:hover {
-  background: #ece9e0;
+  background: var(--paper-raised);
 }
 .card-top {
   display: flex;
@@ -278,7 +295,7 @@ h1 {
   gap: 0.5rem;
   font-size: 0.72rem;
   padding: 0.5rem 0.8rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-line);
   border-radius: 0.35rem;
   background: transparent;
   color: var(--ink);
@@ -298,7 +315,8 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #080808;
+  background: var(--stage);
+  box-shadow: 0 0 0 1px var(--stage-edge);
   width: 100%;
   min-height: 120px;
   border-radius: 0.4rem;
@@ -443,5 +461,5 @@ h1 {
   font: inherit;
 }
 .study-stage canvas:focus-visible {
-  outline-color: #e5bea0;
+  outline-color: var(--stage-focus);
 }
